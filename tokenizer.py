@@ -41,21 +41,15 @@ class SourceReader:
 
     c = self._buf[self._buf_index]
     self._buf_index += 1
-    if self._buf_index >= len(self._buf):
+
+    if self._buf_index == len(self._buf):
       self._buf = None
       self._buf_index = -1
 
-    match c:
-      case "\r":
-        self._last_char_was_cr = True
-        self._line_number += 1
-        self._column_number = 1
-      case "\n":
-        if self._last_char_was_cr:
-          self._last_char_was_cr = False
-        else:
-          self._line_number += 1
-          self._column_number = 1
+    if self._last_char_was_cr and c != "\n":
+      self._line_number += 1
+      self._column_number = 1
+    self._last_char_was_cr = False
 
     if result is None:
       result = SourceCharacter()
@@ -63,8 +57,15 @@ class SourceReader:
     result.c = c
     result.line_number = self._line_number
     result.column_number = self._column_number
-
     self._column_number += 1
+
+    match c:
+      case "\r":
+        self._last_char_was_cr = True
+      case "\n":
+        self._line_number += 1
+        self._column_number = 1
+
     return result
 
 

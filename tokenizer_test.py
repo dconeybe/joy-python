@@ -5,6 +5,61 @@ from absl.testing import absltest
 import tokenizer
 
 
+class SourceReaderTest(absltest.TestCase):
+
+  def test_empty_file_should_produce_no_characters(self):
+    source_reader = tokenizer.SourceReader(io.StringIO())
+
+    read_result = source_reader.read()
+
+    self.assertIsNone(read_result)
+
+  def test_should_produce_one_character_for_each_character_in_the_file(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc \r\n 123 _$"))
+
+    read_results = self.read_all(source_reader)
+
+    self.assertLen(read_results, 13)
+
+  def test_should_produce_the_correct_characters(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc \r\n 123 _$"))
+
+    read_results = self.read_all(source_reader)
+
+    read_chars = "".join(read_result.c for read_result in read_results)
+    self.assertEqual(read_chars, "abc \r\n 123 _$")
+
+  def test_should_produce_the_correct_line_numbers(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("A \r\n Z\n\n_ \r$"))
+
+    read_results = self.read_all(source_reader)
+
+    read_line_numbers = tuple(read_result.line_number for read_result in read_results)
+    self.assertEqual(read_line_numbers, (1, 1, 1, 1, 2, 2, 2, 3, 4, 4, 4, 5))
+
+  def test_should_produce_the_correct_column_numbers(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc \r\n def\n\n_ \r$"))
+
+    read_results = self.read_all(source_reader)
+
+    read_column_numbers = tuple(read_result.column_number for read_result in read_results)
+    self.assertEqual(read_column_numbers, (1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 3, 1))
+
+  def read_all(
+      self, source_reader: tokenizer.SourceReader, max_num_chars: int | None = None
+  ) -> list[tokenizer.SourceCharacter]:
+    read_results = []
+    for _ in range(max_num_chars if max_num_chars is not None else 1000):
+      read_result = source_reader.read()
+      if read_result is None:
+        break
+      read_results.append(read_result)
+    else:
+      self.fail(f"SourceReader maximum number of results returned: {len(read_results)}")
+
+    return read_results
+
+
 class TokenizerTest(absltest.TestCase):
 
   def test_empty_file_should_produce_no_tokens(self):
@@ -15,9 +70,7 @@ class TokenizerTest(absltest.TestCase):
     self.assertIsNone(token)
 
   def test_whitespace_file_should_produce_no_tokens(self):
-    source_text = "\r\n    \t\t\n\r"
-    t = tokenizer.Tokenizer(tokenizer.SourceReader(io.StringIO(source_text)))
-    token = tokenizer.Token()
+    t = tokenizer.Tokenizer(tokenizer.SourceReader(io.StringIO("  \t\n\r\r\n  \t  \r\n")))
 
     token = t.next()
 
@@ -42,16 +95,13 @@ class TokenizerTest(absltest.TestCase):
     )
 
   def test_yields_a_bunch_of_tokens_on_one_line(self):
-    source_text = "abc def ghi a12 b23 a_      b"
+    source_text = "abc d12 _yz"
     t = tokenizer.Tokenizer(tokenizer.SourceReader(io.StringIO(source_text)))
     token = tokenizer.Token()
 
     token1 = t.next()
     token2 = t.next()
     token3 = t.next()
-    token4 = t.next()
-    token5 = t.next()
-    token6 = t.next()
     token_last = t.next()
 
     self.assertEqual(
@@ -71,7 +121,7 @@ class TokenizerTest(absltest.TestCase):
             end_line_number=1,
             start_column_number=5,
             end_column_number=7,
-            identifier="def",
+            identifier="d12",
         ),
     )
     self.assertEqual(
@@ -81,19 +131,10 @@ class TokenizerTest(absltest.TestCase):
             end_line_number=1,
             start_column_number=9,
             end_column_number=11,
-            identifier="ghi",
+            identifier="_yz",
         ),
     )
-    self.assertEqual(
-        token3,
-        tokenizer.Token(
-            start_line_number=1,
-            end_line_number=1,
-            start_column_number=13,
-            end_column_number=15,
-            identifier="a12",
-        ),
-    )
+    self.assertIsNone(token_last)
 
 
 if __name__ == "__main__":
