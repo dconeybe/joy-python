@@ -14,14 +14,14 @@ class SourceReader:
     self.f = f
     self.buffer_size = buffer_size if buffer_size is not None else 1024
 
-    self._buf = ""
-    self._buf_index = 0
+    self._current_buffer = ""
+    self._current_buffer_index = 0
     self._lexeme_start_index = 0
     self._lexeme_end_index = 0
     self._eof = False
 
   def lexeme(self) -> str:
-    return self._buf[self._lexeme_start_index : self._lexeme_end_index]
+    return self._current_buffer[self._lexeme_start_index : self._lexeme_end_index]
 
   def lexeme_length(self) -> int:
     return self._lexeme_end_index - self._lexeme_start_index
@@ -35,33 +35,33 @@ class SourceReader:
     if self._eof:
       return
 
-    if self._buf_index == len(self._buf):
-      self._buf = self.f.read(self.buffer_size)
-      if len(self._buf) == 0:
+    if self._current_buffer_index == len(self._current_buffer):
+      self._current_buffer = self.f.read(self.buffer_size)
+      if len(self._current_buffer) == 0:
         self._eof = True
         return
-      self._buf_index = 0
+      self._current_buffer_index = 0
 
     if mode != ReadMode.APPEND:
-      self._lexeme_start_index = self._buf_index
-      self._lexeme_end_index = self._buf_index
+      self._lexeme_start_index = self._current_buffer_index
+      self._lexeme_end_index = self._current_buffer_index
 
     while True:
       if max_lexeme_length is not None and self.lexeme_length() >= max_lexeme_length:
         break
 
-      if self._buf_index == len(self._buf):
+      if self._current_buffer_index == len(self._current_buffer):
         self._eof = True
         break
 
-      current_character = self._buf[self._buf_index]
+      current_character = self._current_buffer[self._current_buffer_index]
       if current_character not in accepted_characters:
         break
-      self._buf_index += 1
-      self._lexeme_end_index = self._buf_index
+      self._current_buffer_index += 1
+      self._lexeme_end_index = self._current_buffer_index
 
     if mode == ReadMode.SKIP:
-      self._lexeme_start_index = self._buf_index
+      self._lexeme_start_index = self._current_buffer_index
 
 
 @enum.unique
