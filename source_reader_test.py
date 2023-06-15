@@ -100,12 +100,77 @@ class SourceReaderTest(absltest.TestCase):
     self.assertEqual(final_lexeme, source_reader.lexeme())
     self.assertTrue(source_reader.eof())
 
-  def test_read_when_lexeme_spans_buffer_sizes(self):
+  def test_read_when_lexeme_spans_buffer_sizes_basic_test(self):
     source_reader = SourceReader(io.StringIO("aaaXXXcccYYYddd"), buffer_size=5)
 
-    source_reader.read(accepted_characters="abcXY", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    source_reader.read(accepted_characters="abcdXY", mode=ReadMode.NORMAL, max_lexeme_length=100)
     self.assertEqual("aaaXXXcccYYYddd", source_reader.lexeme())
     self.assertTrue(source_reader.eof())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL, ("aaaXXXccc", "YYY", "ddd")),
+      ("APPEND", ReadMode.APPEND, ("aaaXXXccc", "aaaXXXcccYYY", "aaaXXXcccYYYddd")),
+      ("SKIP", ReadMode.SKIP, ("", "", "")),
+  ])
+  def test_read_when_lexeme_spans_buffer_sizes(
+      self, _, read_mode: ReadMode, expected_lexemes: tuple[str]
+  ):
+    source_reader = SourceReader(io.StringIO("aaaXXXcccYYYddd"), buffer_size=5)
+
+    source_reader.read(accepted_characters="aXc", mode=read_mode, max_lexeme_length=100)
+    self.assertEqual(expected_lexemes[0], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(accepted_characters="Y", mode=read_mode, max_lexeme_length=100)
+    self.assertEqual(expected_lexemes[1], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(accepted_characters="d", mode=read_mode, max_lexeme_length=100)
+    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
+    self.assertTrue(source_reader.eof())
+
+    source_reader.read(accepted_characters="acdXY", mode=read_mode, max_lexeme_length=100)
+    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
+    self.assertTrue(source_reader.eof())
+
+  def test_read_when_lexeme_spans_buffer_sizes_complex_test(self):
+    source_reader = SourceReader(io.StringIO("aaaXXXcccYYY" * 100), buffer_size=3)
+
+    source_reader.read(accepted_characters="aXc", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    self.assertEqual("aaaXXXccc", source_reader.lexeme())
+    source_reader.read(accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100)
+    self.assertEqual("aaaXXXcccYYYaaaXXX", source_reader.lexeme())
+    source_reader.read(accepted_characters="cYa", mode=ReadMode.APPEND, max_lexeme_length=100)
+    self.assertEqual("aaaXXXcccYYYaaaXXXcccYYYaaa", source_reader.lexeme())
+    source_reader.read(accepted_characters="Xc", mode=ReadMode.SKIP, max_lexeme_length=100)
+    self.assertEqual("", source_reader.lexeme())
+    source_reader.read(accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100)
+    self.assertEqual("YYYaaaXXX", source_reader.lexeme())
+    source_reader.read(accepted_characters="cYa", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    self.assertEqual("cccYYYaaa", source_reader.lexeme())
+    source_reader.read(accepted_characters="acXY", mode=ReadMode.NORMAL, max_lexeme_length=10000)
+    self.assertTrue(source_reader.eof())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL, ("aaaXXXcc", "cYY", "YaaaXXXcccYYYaaaX")),
+      ("APPEND", ReadMode.APPEND, ("aaaXXXcc", "aaaXXXcc", "aaaXXXcccYYYaaaXX")),
+      ("SKIP", ReadMode.SKIP, ("", "", "")),
+  ])
+  def test_read_when_lexeme_spans_buffer_sizes_and_hits_max_length(
+      self, _, read_mode: ReadMode, expected_lexemes: tuple[str]
+  ):
+    source_reader = SourceReader(io.StringIO("aaaXXXcccYYY" * 100), buffer_size=2)
+
+    source_reader.read(accepted_characters="aXc", mode=read_mode, max_lexeme_length=8)
+    self.assertEqual(expected_lexemes[0], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(accepted_characters="cY", mode=read_mode, max_lexeme_length=3)
+    self.assertEqual(expected_lexemes[1], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(accepted_characters="cYaX", mode=read_mode, max_lexeme_length=17)
+    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
 
 
 if __name__ == "__main__":
