@@ -48,7 +48,10 @@ class SourceReader:
     return self._eof
 
   def read(
-      self, accepted_characters: str, mode: ReadMode, max_lexeme_length: int | None
+      self,
+      accepted_characters: str,
+      mode: ReadMode,
+      max_lexeme_length: int | None,
   ) -> None:
     if self._eof:
       return
