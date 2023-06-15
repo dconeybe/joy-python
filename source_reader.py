@@ -23,6 +23,9 @@ class SourceReader:
   def lexeme(self) -> str:
     return self._buf[self._lexeme_start_index : self._lexeme_end_index]
 
+  def lexeme_length(self) -> int:
+    return self._lexeme_end_index - self._lexeme_start_index
+
   def eof(self) -> bool:
     return self._eof
 
@@ -41,18 +44,24 @@ class SourceReader:
 
     if mode != ReadMode.APPEND:
       self._lexeme_start_index = self._buf_index
+      self._lexeme_end_index = self._buf_index
 
     while True:
-      if self._buf_index == len(self._buf):
+      if max_lexeme_length is not None and self.lexeme_length() >= max_lexeme_length:
         break
+
+      if self._buf_index == len(self._buf):
+        self._eof = True
+        break
+
       current_character = self._buf[self._buf_index]
       if current_character not in accepted_characters:
         break
       self._buf_index += 1
+      self._lexeme_end_index = self._buf_index
 
-    self._lexeme_end_index = self._buf_index
     if mode == ReadMode.SKIP:
-      self._lexeme_start_index = self._lexeme_end_index
+      self._lexeme_start_index = self._buf_index
 
 
 @enum.unique
