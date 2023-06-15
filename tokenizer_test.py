@@ -45,12 +45,52 @@ class SourceReaderTest(absltest.TestCase):
     read_column_numbers = tuple(read_result.column_number for read_result in read_results)
     self.assertEqual(read_column_numbers, (1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 3, 1))
 
+  def test_skip_chars_should_be_skipped(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abcdefgabcdefgabcdefg"))
+
+    read_results = self.read_all(source_reader, skip_chars="aceg")
+
+    read_chars = "".join(read_result.c for read_result in read_results)
+    self.assertEqual(read_chars, "bdfbdfbdf")
+
+  def test_skip_chars_should_still_produce_correct_line_numbers(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abcdefg\nabcdefg\r\nabcdefg"))
+
+    read_results = self.read_all(source_reader, skip_chars="aceg")
+
+    read_line_numbers = tuple(read_result.line_number for read_result in read_results)
+    self.assertEqual(read_line_numbers, (1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3))
+
+  def test_skip_chars_should_still_produce_correct_column_numbers(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abcdefg\nabcdefg\r\nabcdefg"))
+
+    read_results = self.read_all(source_reader, skip_chars="aceg")
+
+    read_column_numbers = tuple(read_result.column_number for read_result in read_results)
+    self.assertEqual(read_column_numbers, (2, 4, 6, 8, 2, 4, 6, 8, 9, 2, 4, 6))
+
+  def test_skip_chars_should_still_produce_correct_line_numbers_when_skipping_whitespace(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc\ndef\n\nghi\r\n\rj"))
+
+    read_results = self.read_all(source_reader, skip_chars="\r\n")
+
+    read_line_numbers = tuple(read_result.line_number for read_result in read_results)
+    self.assertEqual(read_line_numbers, (1, 1, 1, 2, 2, 2, 4, 4, 4, 6))
+
+  def test_skip_chars_should_still_produce_correct_column_numbers_when_skipping_whitespace(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc\ndef\n\nghi\r\n\rj"))
+
+    read_results = self.read_all(source_reader, skip_chars="\r\n")
+
+    read_column_numbers = tuple(read_result.column_number for read_result in read_results)
+    self.assertEqual(read_column_numbers, (1, 2, 3, 1, 2, 3, 1, 2, 3, 1))
+
   def read_all(
-      self, source_reader: tokenizer.SourceReader, max_num_chars: int | None = None
+      self, source_reader: tokenizer.SourceReader, max_num_chars: int | None = None, **kwargs
   ) -> list[tokenizer.SourceCharacter]:
     read_results = []
     for _ in range(max_num_chars if max_num_chars is not None else 1000):
-      read_result = source_reader.read()
+      read_result = source_reader.read(**kwargs)
       if read_result is None:
         break
       read_results.append(read_result)

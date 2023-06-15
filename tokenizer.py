@@ -1,3 +1,4 @@
+from collections.abc import Collection
 import dataclasses
 import io
 from typing import TextIO
@@ -20,7 +21,9 @@ class SourceReader:
     self._buf_index = -1
     self._last_char_was_cr = False
 
-  def read(self, result: SourceCharacter | None = None) -> SourceCharacter | None:
+  def read(
+      self, result: SourceCharacter | None = None, skip_chars: Collection[str] | None = None
+  ) -> SourceCharacter | None:
     """
     Reads one character from the underlying stream.
 
@@ -28,45 +31,52 @@ class SourceReader:
       result: The object into which to store the information about the character; the contents of
         this object are undefined if False is returned; if None, then a new SourceCharacter object
         will be created and used.
+      skip_chars: Characters that will be skipped if encountered; these skipped characters still
+        advance the column and line numbers. If None, then no characters will be skipped. A common
+        use case for this argument is to skip whitespace between tokens.
 
     Returns:
       Information about the character, or None if end-of-input was reached.
     """
-    if self._buf is None:
-      self._buf = self.f.read(8192)
-      self._buf_index = 0
+    while True:
+      if self._buf is None:
+        self._buf = self.f.read(8192)
+        self._buf_index = 0
 
-    if len(self._buf) == 0:
-      return None
+      if len(self._buf) == 0:
+        return None
 
-    c = self._buf[self._buf_index]
-    self._buf_index += 1
+      c = self._buf[self._buf_index]
+      self._buf_index += 1
 
-    if self._buf_index == len(self._buf):
-      self._buf = None
-      self._buf_index = -1
+      if self._buf_index == len(self._buf):
+        self._buf = None
+        self._buf_index = -1
 
-    if self._last_char_was_cr and c != "\n":
-      self._line_number += 1
-      self._column_number = 1
-    self._last_char_was_cr = False
-
-    if result is None:
-      result = SourceCharacter()
-
-    result.c = c
-    result.line_number = self._line_number
-    result.column_number = self._column_number
-    self._column_number += 1
-
-    match c:
-      case "\r":
-        self._last_char_was_cr = True
-      case "\n":
+      if self._last_char_was_cr and c != "\n":
         self._line_number += 1
         self._column_number = 1
+      self._last_char_was_cr = False
 
-    return result
+      if result is None:
+        result = SourceCharacter()
+
+      result.c = c
+      result.line_number = self._line_number
+      result.column_number = self._column_number
+      self._column_number += 1
+
+      match c:
+        case "\r":
+          self._last_char_was_cr = True
+        case "\n":
+          self._line_number += 1
+          self._column_number = 1
+
+      if skip_chars and c in skip_chars:
+        continue
+
+      return result
 
 
 @dataclasses.dataclass
