@@ -33,7 +33,7 @@ class SourceReader:
 
     return result.getvalue()
 
-  def _lexeme_length(self) -> int:
+  def lexeme_length(self) -> int:
     if len(self._lexeme_buffers) == 0:
       return self._lexeme_end_index - self._lexeme_start_index
 
@@ -57,7 +57,7 @@ class SourceReader:
       return
 
     if mode == ReadMode.APPEND:
-      lexeme_length = self._lexeme_length()
+      lexeme_length = self.lexeme_length()
     else:
       lexeme_length = 0
       self._lexeme_buffers = []

@@ -9,6 +9,9 @@ import source_reader as source_reader_module
 SourceReader = source_reader_module.SourceReader
 ReadMode = source_reader_module.ReadMode
 
+# TODO: Add tests for lexeme_length()
+# TODO: Add tests for max_lexeme_length argument to read()
+
 
 class SourceReaderTest(absltest.TestCase):
 
