@@ -85,6 +85,53 @@ class SourceReaderTest(absltest.TestCase):
     read_column_numbers = tuple(read_result.column_number for read_result in read_results)
     self.assertEqual(read_column_numbers, (1, 2, 3, 1, 2, 3, 1, 2, 3, 1))
 
+  def test_unread_should_cause_read_to_return_the_exact_same_token(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc"))
+
+    token1 = source_reader.read()
+    source_reader.unread()
+    self.assertIs(source_reader.read(), token1)
+
+    token2 = source_reader.read()
+    source_reader.unread()
+    self.assertIs(source_reader.read(), token2)
+
+    token3 = source_reader.read()
+    source_reader.unread()
+    self.assertIs(source_reader.read(), token3)
+
+  def test_unread_should_do_nothing_if_invoked_after_end_of_file(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc"))
+    source_reader.read()
+    source_reader.read()
+    source_reader.read()
+    last_token = source_reader.read()
+    self.assertIsNone(last_token)  # Make sure we are actually at the end-of-file
+
+    source_reader.unread()
+
+    self.assertIsNone(source_reader.read())
+
+  def test_unread_should_raise_if_invoked_before_read(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc"))
+
+    with self.assertRaises(RuntimeError) as assert_raises_context:
+      source_reader.unread()
+
+    exception_message = str(assert_raises_context.exception).lower()
+    self.assertRegex(exception_message, r"read().*invoked.*once")
+
+  def test_unread_should_raise_if_invoked_multiple_times_without_interleaving_read_invocation(self):
+    source_reader = tokenizer.SourceReader(io.StringIO("abc"))
+    source_reader.read()
+    source_reader.unread()
+
+    with self.assertRaises(RuntimeError) as assert_raises_context:
+      source_reader.unread()
+
+    exception_message = str(assert_raises_context.exception).lower()
+    self.assertRegex(exception_message, r"invoked multiple times")
+
   def read_all(
       self, source_reader: tokenizer.SourceReader, max_num_chars: int | None = None, **kwargs
   ) -> list[tokenizer.SourceCharacter]:

@@ -19,7 +19,8 @@ class SourceReader:
     self._column_number = 1
     self._buf: str | None = None
     self._buf_index = -1
-    self._last_char_was_cr = False
+    self._buffered_char: SourceCharacter | None = None
+    self._last_read_char: SourceCharacter | None = None
 
   def read(
       self, result: SourceCharacter | None = None, skip_chars: Collection[str] | None = None
@@ -38,12 +39,20 @@ class SourceReader:
     Returns:
       Information about the character, or None if end-of-input was reached.
     """
+    buffered_char = self._buffered_char
+    self._buffered_char = None
+    if buffered_char is not None:
+      self._last_read_char = buffered_char
+      return buffered_char
+
     while True:
       if self._buf is None:
         self._buf = self.f.read(8192)
         self._buf_index = 0
 
       if len(self._buf) == 0:
+        self._last_read_char = None
+        self._buffered_char = None
         return None
 
       c = self._buf[self._buf_index]
@@ -53,10 +62,9 @@ class SourceReader:
         self._buf = None
         self._buf_index = -1
 
-      if self._last_char_was_cr and c != "\n":
+      if self._last_read_char is not None and self._last_read_char.c == "\r" and c != "\n":
         self._line_number += 1
         self._column_number = 1
-      self._last_char_was_cr = False
 
       if result is None:
         result = SourceCharacter()
@@ -66,17 +74,46 @@ class SourceReader:
       result.column_number = self._column_number
       self._column_number += 1
 
-      match c:
-        case "\r":
-          self._last_char_was_cr = True
-        case "\n":
-          self._line_number += 1
-          self._column_number = 1
+      if c == "\n":
+        self._line_number += 1
+        self._column_number = 1
+
+      self._last_read_char = result
 
       if skip_chars and c in skip_chars:
         continue
 
       return result
+
+  def unread(self) -> None:
+    """
+    Unreads the last character that was returned from read().
+
+    Note that the exact object returned from the last invocation of read() will be returned from the
+    next invocation of read(). Therefore, if any changes are made to the object returned from the
+    last invocation of read() then they will be reflected in the object returned from the next
+    invocation of read().
+
+    Invoking this method after read() has returned None has no effect.
+
+    Raises:
+      RuntimeError: if invoked when there is no character to unread, such as before the first
+        invocation of read() or the object returned from the last invocation of read() has already
+        been unread.
+    """
+    if self._last_read_char is None:
+      if self._buf is None:
+        raise RuntimeError("unread() must not be invoked until read() is invoked at least once")
+      elif len(self._buf) == 0:
+        return  # Do nothing if invoked after EOF, as documented.
+      else:
+        raise RuntimeError(
+            "unread() must not be invoked multiple times"
+            "without an interleaving invocation of read()"
+        )
+
+    self._buffered_char = self._last_read_char
+    self._last_read_char = None
 
 
 @dataclasses.dataclass
