@@ -166,7 +166,6 @@ class TokenizerTest(absltest.TestCase):
   def test_stream_of_identifier_chars_should_produce_1_token(self):
     source_text = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
     t = tokenizer.Tokenizer(tokenizer.SourceReader(io.StringIO(source_text)))
-    token = tokenizer.Token()
 
     token = t.next()
 
@@ -184,7 +183,6 @@ class TokenizerTest(absltest.TestCase):
   def test_yields_a_bunch_of_tokens_on_one_line(self):
     source_text = "abc d12 _yz"
     t = tokenizer.Tokenizer(tokenizer.SourceReader(io.StringIO(source_text)))
-    token = tokenizer.Token()
 
     token1 = t.next()
     token2 = t.next()
