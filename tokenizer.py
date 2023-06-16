@@ -17,15 +17,7 @@ class Tokenizer:
     return self.source_reader.eof()
 
   def read_identifier(self) -> str | None:
-    # Skip leading whitespace
-    self.source_reader.read(
-        accepted_characters=_WHITESPACE_CHARS,
-        mode=source_reader_module.ReadMode.SKIP,
-        max_lexeme_length=None,
-    )
-
-    if self.source_reader.eof():
-      return None
+    self._skip_whitespace_and_comments()
 
     # Read the first character(s) of an identifier
     self.source_reader.read(
@@ -34,7 +26,11 @@ class Tokenizer:
         max_lexeme_length=1,
     )
 
+    # Fail if an invalid identifier start character was encountered.
     if self.source_reader.lexeme_length() == 0:
+      if self.source_reader.eof():
+        return None
+
       self.source_reader.read(
           accepted_characters=_WHITESPACE_CHARS,
           mode=source_reader_module.ReadMode.NORMAL,
@@ -64,6 +60,74 @@ class Tokenizer:
 
     return identifier
 
+  def _skip_whitespace_and_comments(self) -> None:
+    while True:
+      # Skip whitespace.
+      self.source_reader.read(
+          accepted_characters=_WHITESPACE_CHARS,
+          mode=source_reader_module.ReadMode.SKIP,
+          max_lexeme_length=None,
+      )
+
+      # Read the next two characters, which potentially start a comment
+      self.source_reader.mark()
+      self.source_reader.read(
+          accepted_characters="/*",
+          mode=source_reader_module.ReadMode.NORMAL,
+          max_lexeme_length=2,
+      )
+
+      # If a comment is starting, then skip it; otherwise, we're done.
+      match self.source_reader.lexeme():
+        case "//":
+          self.source_reader.unmark()
+          self._skip_inline_comment()
+        case "/*":
+          self.source_reader.unmark()
+          self._skip_multiline_comment()
+        case _:
+          self.source_reader.reset()
+          break
+
+  def _skip_inline_comment(self) -> None:
+    self.source_reader.read(
+        accepted_characters="\r\n",
+        mode=source_reader_module.ReadMode.SKIP,
+        max_lexeme_length=None,
+        invert_accepted_characters=True,
+    )
+
+  def _skip_multiline_comment(self) -> None:
+    while True:
+      self.source_reader.read(
+          accepted_characters="*",
+          mode=source_reader_module.ReadMode.SKIP,
+          max_lexeme_length=None,
+          invert_accepted_characters=True,
+      )
+
+      self.source_reader.read(
+          accepted_characters="*",
+          mode=source_reader_module.ReadMode.NORMAL,
+          max_lexeme_length=1,
+      )
+
+      self.source_reader.mark()
+      self.source_reader.read(
+          accepted_characters="/",
+          mode=source_reader_module.ReadMode.NORMAL,
+          max_lexeme_length=1,
+      )
+
+      if self.source_reader.lexeme() == "/":
+        self.source_reader.unmark()
+        break
+
+      if self.source_reader.eof():
+        raise self.UnterminatedMultiLineCommentError()
+
+      self.source_reader.reset()
+
   class ParseError(Exception):
     pass
 
@@ -79,3 +143,6 @@ class Tokenizer:
       super().__init__(message)
       self.identifier = identifier
       self.max_length = max_length
+
+  class UnterminatedMultiLineCommentError(ParseError):
+    pass
