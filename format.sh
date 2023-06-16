@@ -1,7 +1,5 @@
 #!/bin/bash
 
-echo '========================= Running pyink ========================='
-
 readonly pyink_args=(
   pyink
   --line-length 100
