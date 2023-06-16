@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import dataclasses
 
 import tokenizer as tokenizer_module
@@ -8,7 +7,7 @@ import tokenizer as tokenizer_module
 
 class Parser:
 
-  def __init__(self, tokenizer  : tokenizer_module.Tokenizer) -> None:
+  def __init__(self, tokenizer: tokenizer_module.Tokenizer) -> None:
     self.tokenizer = tokenizer
     self.functions: list[JoyFunction] = []
 

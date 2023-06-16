@@ -22,7 +22,7 @@ class ParserTest(absltest.TestCase):
         """
           function abc
           function def
-          function _12ZZZZ
+          function _12
         """
     )
 
