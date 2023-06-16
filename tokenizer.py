@@ -42,7 +42,13 @@ class Tokenizer:
     )
 
     if self.source_reader.lexeme_length() == 0:
-      raise self.ParseError("invalid identifier")
+      self.source_reader.read(
+          accepted_characters=_WHITESPACE_CHARS,
+          mode=source_reader_module.ReadMode.NORMAL,
+          max_lexeme_length=20,
+          invert_accepted_characters=True,
+      )
+      raise self.ParseError(f"invalid identifier: {self.source_reader.lexeme()}")
 
     # Read the subsequent character(s) of an identifier
     self.source_reader.read(

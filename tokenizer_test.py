@@ -57,8 +57,9 @@ class TokenizerTest(absltest.TestCase):
     with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
       tokenizer.read()
 
-    exception_message = str(assert_raises_context.exception).lower()
-    self.assertIn("invalid identifier", exception_message)
+    exception_message = str(assert_raises_context.exception)
+    self.assertIn("invalid identifier", exception_message.lower())
+    self.assertIn("1ab", exception_message)
 
   def test_raises_on_identifier_too_long(self):
     tokenizer = self.create_tokenizer("a" * 300)
@@ -66,9 +67,9 @@ class TokenizerTest(absltest.TestCase):
     with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
       tokenizer.read()
 
-    exception_message = str(assert_raises_context.exception).lower()
+    exception_message = str(assert_raises_context.exception)
     self.assertIn("a" * 257, exception_message)
-    self.assertIn("exceeds maximum length", exception_message)
+    self.assertIn("exceeds maximum length", exception_message.lower())
     self.assertIn("256", exception_message)
     self.assertIsNone(tokenizer.token())
 
