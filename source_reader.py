@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import io
 from typing import TextIO
 
 
@@ -14,28 +13,17 @@ class SourceReader:
     self.f = f
     self.buffer_size = buffer_size if buffer_size is not None else 1024
 
-    self._current_buffer = ""
-    self._current_buffer_index = 0
-    self._lexeme_length = 0
-    self._lexeme_buffers: list[str] = []
-    self._lexeme_start_index = 0
-    self._lexeme_end_index = 0
+    self._buffer = ""
+    self._buffer_offset = 0
+    self._lexeme = ""
+    self._mark_accumulator: str | None = None
     self._eof = False
 
   def lexeme(self) -> str:
-    if len(self._lexeme_buffers) == 0:
-      return self._current_buffer[self._lexeme_start_index : self._lexeme_end_index]
-
-    result = io.StringIO()
-    result.write(self._lexeme_buffers[0][self._lexeme_start_index :])
-    for i in range(1, len(self._lexeme_buffers)):
-      result.write(self._lexeme_buffers[i])
-    result.write(self._current_buffer[: self._lexeme_end_index])
-
-    return result.getvalue()
+    return self._lexeme
 
   def lexeme_length(self) -> int:
-    return self._lexeme_length
+    return len(self._lexeme)
 
   def eof(self) -> bool:
     return self._eof
@@ -50,41 +38,86 @@ class SourceReader:
     if self._eof:
       return
 
-    if mode != ReadMode.APPEND:
-      self._lexeme_length = 0
-      self._lexeme_buffers = []
-      self._lexeme_start_index = self._current_buffer_index
-      self._lexeme_end_index = self._current_buffer_index
+    if mode == ReadMode.APPEND:
+      lexeme_length = len(self._lexeme)
+    else:
+      self._lexeme = ""
+      lexeme_length = 0
 
     while True:
-      if max_lexeme_length is not None and self._lexeme_length >= max_lexeme_length:
+      if max_lexeme_length is not None and lexeme_length >= max_lexeme_length:
         break
 
-      if self._current_buffer_index == len(self._current_buffer):
-        if self._lexeme_length > 0 and mode != ReadMode.SKIP:
-          self._lexeme_buffers.append(self._current_buffer)
-        self._current_buffer = self.f.read(self.buffer_size)
-        self._current_buffer_index = 0
-        if self._lexeme_length == 0:
-          self._lexeme_start_index = 0
-          self._lexeme_end_index = 0
-        if len(self._current_buffer) == 0:
+      if self._buffer_offset == len(self._buffer):
+        self._buffer = self.f.read(self.buffer_size)
+        self._buffer_offset = 0
+        if len(self._buffer) == 0:
           self._eof = True
           break
 
-      current_character = self._current_buffer[self._current_buffer_index]
+      current_character = self._buffer[self._buffer_offset]
 
       if invert_accepted_characters and current_character in accepted_characters:
         break
       elif not invert_accepted_characters and current_character not in accepted_characters:
         break
 
-      self._current_buffer_index += 1
-      self._lexeme_length += 1
+      self._buffer_offset += 1
+      lexeme_length += 1
 
-    self._lexeme_end_index = self._current_buffer_index
-    if mode == ReadMode.SKIP:
-      self._lexeme_start_index = self._current_buffer_index
+      if self._mark_accumulator is not None:
+        self._mark_accumulator += current_character
+
+      if mode != ReadMode.SKIP:
+        self._lexeme += current_character
+
+  def mark(self) -> None:
+    """
+    Marks the current position.
+
+    A subsequent call to reset() repositions this reader at the last marked position so that
+    subsequent reads re-read the same characters.
+
+    The general contract of mark is that the stream saves all the characters read after the call to
+    mark() and stands ready to supply those same bytes again if and whenever reset() is called. It
+    is valid to call mark() even once end-of-input is reached (i.e. eof() returns True).
+
+    If a mark is already set then it is replaced by the new mark.
+    """
+    self._mark_accumulator = ""
+
+  def unmark(self) -> None:
+    """
+    Removes the mark, if set, as if mark() had never been invoked.
+    """
+    self._mark_accumulator = None
+
+  def reset(self) -> None:
+    """
+    Repositions this reader to the position at the time mark() was last called.
+
+    The stream is reset to a state such that all the characters read since the most recent call to
+    mark() will be resupplied to subsequent callers of read(), followed by any characters that
+    otherwise would have been the next input data as of the time of the call to reset().
+
+    If mark() was called at end-of-input (i.e. when eof() returned True) then reset() keeps the
+    stream at the end-of-input (i.e. it effectively does nothing but clear the mark).
+
+    Raises:
+      ResetCalledWithoutMarkSetError: if no mark is set; this could be because (a) mark() has never
+        been called, (b) because a previous invocation of reset() already "consumed" the mark, or
+        (c) unmark() was called to clear the mark.
+    """
+    if self._mark_accumulator is None:
+      raise self.ResetCalledWithoutMarkSetError("reset() called when the mark is not set")
+    self._buffer = self._mark_accumulator + self._buffer[self._buffer_offset :]
+    self._buffer_offset = 0
+    self._lexeme = ""
+    self._mark_accumulator = None
+    self._eof = False
+
+  class ResetCalledWithoutMarkSetError(RuntimeError):
+    pass
 
 
 @enum.unique
