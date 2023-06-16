@@ -45,6 +45,7 @@ class SourceReader:
       accepted_characters: str,
       mode: ReadMode,
       max_lexeme_length: int | None,
+      invert_accepted_characters: bool = False,
   ) -> None:
     if self._eof:
       return
@@ -72,8 +73,12 @@ class SourceReader:
           break
 
       current_character = self._current_buffer[self._current_buffer_index]
-      if current_character not in accepted_characters:
+
+      if invert_accepted_characters and current_character in accepted_characters:
         break
+      elif not invert_accepted_characters and current_character not in accepted_characters:
+        break
+
       self._current_buffer_index += 1
       self._lexeme_length += 1
 

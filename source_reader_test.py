@@ -179,6 +179,41 @@ class SourceReaderTest(absltest.TestCase):
     source_reader.read(accepted_characters="cYaX", mode=read_mode, max_lexeme_length=17)
     self.assertEqual(expected_lexemes[2], source_reader.lexeme())
 
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL, ("aaa", "XXXbbb", "YYYccc")),
+      ("APPEND", ReadMode.APPEND, ("aaa", "aaaXXXbbb", "aaaXXXbbbYYYccc")),
+      ("SKIP", ReadMode.SKIP, ("", "", "")),
+  ])
+  def test_invert_accepted_characters(self, _, read_mode: ReadMode, expected_lexemes: tuple[str]):
+    source_reader = SourceReader(io.StringIO("aaaXXXbbbYYYcccZZZ"))
+
+    source_reader.read(
+        accepted_characters="X",
+        mode=read_mode,
+        max_lexeme_length=100,
+        invert_accepted_characters=True,
+    )
+    self.assertEqual(expected_lexemes[0], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(
+        accepted_characters="Y",
+        mode=read_mode,
+        max_lexeme_length=100,
+        invert_accepted_characters=True,
+    )
+    self.assertEqual(expected_lexemes[1], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
+    source_reader.read(
+        accepted_characters="Z",
+        mode=read_mode,
+        max_lexeme_length=100,
+        invert_accepted_characters=True,
+    )
+    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
+    self.assertFalse(source_reader.eof())
+
 
 if __name__ == "__main__":
   absltest.main()
