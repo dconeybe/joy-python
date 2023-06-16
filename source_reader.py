@@ -16,6 +16,7 @@ class SourceReader:
     self._buffer = ""
     self._buffer_offset = 0
     self._lexeme = ""
+    self._mark_accumulator: str | None = None
     self._eof = False
 
   def lexeme(self) -> str:
@@ -63,8 +64,60 @@ class SourceReader:
 
       self._buffer_offset += 1
       lexeme_length += 1
+
+      if self._mark_accumulator is not None:
+        self._mark_accumulator += current_character
+
       if mode != ReadMode.SKIP:
         self._lexeme += current_character
+
+  def mark(self) -> None:
+    """
+    Marks the current position.
+
+    A subsequent call to reset() repositions this reader at the last marked position so that
+    subsequent reads re-read the same characters.
+
+    The general contract of mark is that the stream saves all the characters read after the call to
+    mark() and stands ready to supply those same bytes again if and whenever reset() is called. It
+    is valid to call mark() even once end-of-input is reached (i.e. eof() returns True).
+
+    If a mark is already set then it is replaced by the new mark.
+    """
+    self._mark_accumulator = ""
+
+  def unmark(self) -> None:
+    """
+    Removes the mark, if set, as if mark() had never been invoked.
+    """
+    self._mark_accumulator = None
+
+  def reset(self) -> None:
+    """
+    Repositions this reader to the position at the time mark() was last called.
+
+    The stream is reset to a state such that all the characters read since the most recent call to
+    mark() will be resupplied to subsequent callers of read(), followed by any characters that
+    otherwise would have been the next input data as of the time of the call to reset().
+
+    If mark() was called at end-of-input (i.e. when eof() returned True) then reset() keeps the
+    stream at the end-of-input (i.e. it effectively does nothing but clear the mark).
+
+    Raises:
+      ResetCalledWithoutMarkSetError: if no mark is set; this could be because (a) mark() has never
+        been called, (b) because a previous invocation of reset() already "consumed" the mark, or
+        (c) unmark() was called to clear the mark.
+    """
+    if self._mark_accumulator is None:
+      raise self.ResetCalledWithoutMarkSetError("reset() called when the mark is not set")
+    self._buffer = self._mark_accumulator + self._buffer[self._buffer_offset :]
+    self._buffer_offset = 0
+    self._lexeme = ""
+    self._mark_accumulator = None
+    self._eof = False
+
+  class ResetCalledWithoutMarkSetError(RuntimeError):
+    pass
 
 
 @enum.unique
