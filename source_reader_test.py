@@ -19,6 +19,10 @@ class SourceReaderTest(absltest.TestCase):
     source_reader = SourceReader(io.StringIO())
     self.assertEqual("", source_reader.lexeme())
 
+  def test_lexeme_length_on_new_instance_should_return_zero(self):
+    source_reader = SourceReader(io.StringIO())
+    self.assertEqual(0, source_reader.lexeme_length())
+
   def test_eof_on_new_instance_should_return_False(self):
     source_reader = SourceReader(io.StringIO())
     self.assertFalse(source_reader.eof())
