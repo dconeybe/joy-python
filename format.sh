@@ -7,6 +7,7 @@ readonly pyink_args=(
   --pyink
   --pyink-indentation 2
   *.py
+  "$@"
 )
 
 echo "${pyink_args[*]}"
