@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10' 
-      - run: pip install absl-py paramaterized pytype
+      - run: pip install absl-py parameterized pytype
       - run: pytype *.py
 
   unittest:
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10' 
-      - run: pip install absl-py paramaterized
+      - run: pip install absl-py parameterized
       - run: python -m unittest -v *_test.py
 
   pyflakes:
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10' 
-      - run: pip install absl-py paramaterized pyflakes
+      - run: pip install absl-py parameterized pyflakes
       - run: pyflakes *.py
 
   pyink:
@@ -58,5 +58,5 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10' 
-      - run: pip install absl-py paramaterized pyink
+      - run: pip install absl-py parameterized pyink
       - run: ./format.sh --diff --no-color
