@@ -59,4 +59,4 @@ jobs:
         with:
           python-version: '3.10' 
       - run: pip install absl-py parameterized pyink
-      - run: ./format.sh --diff --no-color
+      - run: ./format.sh --check --diff --no-color
