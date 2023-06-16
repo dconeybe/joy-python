@@ -11,67 +11,65 @@ Tokenizer = tokenizer_module.Tokenizer
 
 class TokenizerTest(absltest.TestCase):
 
-  def test_token_on_new_instance_should_return_none(self):
-    tokenizer = Tokenizer(source_reader=source_reader_module.SourceReader(io.StringIO("")))
-    self.assertIsNone(tokenizer.token())
-
   def test_eof_on_new_instance_should_return_False(self):
     tokenizer = Tokenizer(source_reader=source_reader_module.SourceReader(io.StringIO("")))
     self.assertFalse(tokenizer.eof())
 
-  def test_read_on_empty_source_should_immediately_go_to_eof(self):
+  def test_read_identifier_on_empty_source_should_immediately_go_to_eof(self):
     tokenizer = self.create_tokenizer("")
 
-    tokenizer.read()
+    read_identifier_result = tokenizer.read_identifier()
 
-    self.assertIsNone(tokenizer.token())
+    self.assertIsNone(read_identifier_result)
     self.assertTrue(tokenizer.eof())
 
-  def test_read_on_entirely_whitespace_source_should_immediately_go_to_eof(self):
+  def test_read_identifier_on_entirely_whitespace_source_should_immediately_go_to_eof(self):
     tokenizer = self.create_tokenizer("  \r\n\n\n\r\t  \t \r \n \t")
 
-    tokenizer.read()
+    read_identifier_result = tokenizer.read_identifier()
 
-    self.assertIsNone(tokenizer.token())
+    self.assertIsNone(read_identifier_result)
     self.assertTrue(tokenizer.eof())
 
-  def test_read_with_multiple_consecutive_identifiers(self):
+  def test_read_identifier_with_multiple_consecutive_identifiers(self):
     tokenizer = self.create_tokenizer("abc   def \na12\r\n b23")
 
-    tokenizer.read()
-    self.assertEqual("abc", tokenizer.token())
+    read_identifier_result1 = tokenizer.read_identifier()
+    self.assertEqual("abc", read_identifier_result1)
     self.assertFalse(tokenizer.eof())
-    tokenizer.read()
-    self.assertEqual("def", tokenizer.token())
+    read_identifier_result2 = tokenizer.read_identifier()
+    self.assertEqual("def", read_identifier_result2)
     self.assertFalse(tokenizer.eof())
-    tokenizer.read()
-    self.assertEqual("a12", tokenizer.token())
+    read_identifier_result3 = tokenizer.read_identifier()
+    self.assertEqual("a12", read_identifier_result3)
     self.assertFalse(tokenizer.eof())
-    tokenizer.read()
-    self.assertEqual("b23", tokenizer.token())
+    read_identifier_result4 = tokenizer.read_identifier()
+    self.assertEqual("b23", read_identifier_result4)
     self.assertTrue(tokenizer.eof())
 
-  def test_raises_on_numeric_start_character(self):
+  def test_read_identifier_raises_on_numeric_start_character(self):
     tokenizer = self.create_tokenizer("1ab")
 
-    with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
-      tokenizer.read()
+    with self.assertRaises(tokenizer.InvalidIdentifierError) as assert_raises_context:
+      tokenizer.read_identifier()
 
     exception_message = str(assert_raises_context.exception)
     self.assertIn("invalid identifier", exception_message.lower())
     self.assertIn("1ab", exception_message)
+    self.assertEqual(assert_raises_context.exception.identifier, "1ab")
 
-  def test_raises_on_identifier_too_long(self):
+  def test_read_identifier_raises_on_identifier_too_long(self):
     tokenizer = self.create_tokenizer("a" * 300)
 
-    with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
-      tokenizer.read()
+    with self.assertRaises(tokenizer.IdentifierTooLongError) as assert_raises_context:
+      tokenizer.read_identifier()
 
     exception_message = str(assert_raises_context.exception)
     self.assertIn("a" * 257, exception_message)
     self.assertIn("exceeds maximum length", exception_message.lower())
     self.assertIn("256", exception_message)
-    self.assertIsNone(tokenizer.token())
+    self.assertEqual(assert_raises_context.exception.identifier, "a" * 257)
+    self.assertEqual(assert_raises_context.exception.max_length, 256)
 
   def create_tokenizer(self, text: str) -> Tokenizer:
     return Tokenizer(source_reader=source_reader_module.SourceReader(io.StringIO(text)))

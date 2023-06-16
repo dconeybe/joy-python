@@ -13,17 +13,10 @@ class Tokenizer:
   def __init__(self, source_reader: source_reader_module.SourceReader) -> None:
     self.source_reader = source_reader
 
-    self._token: str | None = None
-
-  def token(self) -> str | None:
-    return self._token
-
   def eof(self) -> bool:
     return self.source_reader.eof()
 
-  def read(self) -> None:
-    self._token = None
-
+  def read_identifier(self) -> str | None:
     # Skip leading whitespace
     self.source_reader.read(
         accepted_characters=_WHITESPACE_CHARS,
@@ -32,7 +25,7 @@ class Tokenizer:
     )
 
     if self.source_reader.eof():
-      return
+      return None
 
     # Read the first character(s) of an identifier
     self.source_reader.read(
@@ -48,7 +41,11 @@ class Tokenizer:
           max_lexeme_length=20,
           invert_accepted_characters=True,
       )
-      raise self.ParseError(f"invalid identifier: {self.source_reader.lexeme()}")
+      invalid_identifer = self.source_reader.lexeme()
+      raise self.InvalidIdentifierError(
+          identifier=invalid_identifer,
+          message=f"invalid identifier: {self.source_reader.lexeme()}",
+      )
 
     # Read the subsequent character(s) of an identifier
     self.source_reader.read(
@@ -57,13 +54,28 @@ class Tokenizer:
         max_lexeme_length=_MAX_IDENTIFIER_LENGTH + 1,
     )
 
-    lexeme = self.source_reader.lexeme()
-    if len(lexeme) > _MAX_IDENTIFIER_LENGTH:
-      raise self.ParseError(
-          f"identifier exceeds maximum length of {_MAX_IDENTIFIER_LENGTH}: {lexeme}"
+    identifier = self.source_reader.lexeme()
+    if len(identifier) > _MAX_IDENTIFIER_LENGTH:
+      raise self.IdentifierTooLongError(
+          identifier=identifier,
+          max_length=_MAX_IDENTIFIER_LENGTH,
+          message=f"identifier exceeds maximum length of {_MAX_IDENTIFIER_LENGTH}: {identifier}",
       )
 
-    self._token = lexeme
+    return identifier
 
   class ParseError(Exception):
     pass
+
+  class InvalidIdentifierError(ParseError):
+
+    def __init__(self, identifier: str, message: str) -> None:
+      super().__init__(message)
+      self.identifier = identifier
+
+  class IdentifierTooLongError(ParseError):
+
+    def __init__(self, identifier: str, max_length: int, message: str) -> None:
+      super().__init__(message)
+      self.identifier = identifier
+      self.max_length = max_length
