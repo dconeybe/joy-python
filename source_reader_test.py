@@ -334,6 +334,101 @@ class SourceReaderTest(absltest.TestCase):
     with self.assertRaises(source_reader.ResetCalledWithoutMarkSetError):
       source_reader.reset()
 
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL),
+      ("APPEND", ReadMode.APPEND),
+      ("SKIP", ReadMode.SKIP),
+  ])
+  def test_read_until_exact_match_with_empty_text_should_raise(self, _, read_mode: ReadMode):
+    source_reader = SourceReader(io.StringIO("abc"))
+
+    with self.assertRaises(ValueError) as assert_raises_context:
+      source_reader.read_until_exact_match("", read_mode)
+
+    exception_message = str(assert_raises_context.exception)
+    self.assertIn("empty string", exception_message.lower())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL),
+      ("APPEND", ReadMode.APPEND),
+      ("SKIP", ReadMode.SKIP),
+  ])
+  def test_read_until_exact_match_when_marked_should_raise(self, _, read_mode: ReadMode):
+    source_reader = SourceReader(io.StringIO("abc"))
+    source_reader.mark()
+
+    with self.assertRaises(RuntimeError) as assert_raises_context:
+      source_reader.read_until_exact_match("abc", read_mode)
+
+    exception_message = str(assert_raises_context.exception)
+    self.assertIn("not be marked", exception_message.lower())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL),
+      ("APPEND", ReadMode.APPEND),
+      ("SKIP", ReadMode.SKIP),
+  ])
+  def test_read_until_exact_match_on_empty_input(self, _, read_mode: ReadMode):
+    source_reader = SourceReader(io.StringIO(), buffer_size=3)
+
+    return_value = source_reader.read_until_exact_match("abc", read_mode)
+
+    self.assertFalse(return_value)
+    self.assertTrue(source_reader.eof())
+    self.assertEmpty(source_reader.lexeme())
+    self.assertEqual(0, source_reader.lexeme_length())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL, "aaabCzza  bc\nbca\r\n\t"),
+      ("APPEND", ReadMode.APPEND, "aaabCzza  bc\nbca\r\n\t"),
+      ("SKIP", ReadMode.SKIP, ""),
+  ])
+  def test_read_until_exact_match_with_no_match_should_read_to_eof(
+      self, _, read_mode: ReadMode, expected_lexeme: str
+  ):
+    source_reader = SourceReader(io.StringIO("aaabCzza  bc\nbca\r\n\t"), buffer_size=3)
+
+    return_value = source_reader.read_until_exact_match("abc", read_mode)
+
+    self.assertFalse(return_value)
+    self.assertTrue(source_reader.eof())
+    self.assertEqual(expected_lexeme, source_reader.lexeme())
+    self.assertEqual(len(expected_lexeme), source_reader.lexeme_length())
+
+  @parameterized.parameterized.expand([
+      ("NORMAL", ReadMode.NORMAL, ["aaa bbb", " ccc ddd eee f", "ff ggg"]),
+      ("APPEND", ReadMode.APPEND, "aaabCzza  bc\nbca\r\n\t"),
+      ("SKIP", ReadMode.SKIP, ""),
+  ])
+  def test_read_until_exact_match_with_match_in_the_middle(
+      self, _, read_mode: ReadMode, expected_lexemes: list[str]
+  ):
+    source_reader = SourceReader(io.StringIO("aaa bbb ccc ddd eee fff ggg"), buffer_size=3)
+
+    return_value1 = source_reader.read_until_exact_match("bbb", read_mode)
+    self.assertTrue(return_value1)
+    self.assertFalse(source_reader.eof())
+    self.assertEqual(expected_lexemes[0], source_reader.lexeme())
+    self.assertEqual(len(expected_lexemes[0]), source_reader.lexeme_length())
+
+    return_value2 = source_reader.read_until_exact_match("e f", read_mode)
+    self.assertTrue(return_value2)
+    self.assertFalse(source_reader.eof())
+    self.assertEqual(expected_lexemes[1], source_reader.lexeme())
+    self.assertEqual(len(expected_lexemes[1]), source_reader.lexeme_length())
+
+    return_value3 = source_reader.read_until_exact_match("ggg", read_mode)
+    self.assertTrue(return_value3)
+    self.assertFalse(source_reader.eof())
+    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
+    self.assertEqual(len(expected_lexemes[2]), source_reader.lexeme_length())
+
+    return_value4 = source_reader.read_until_exact_match("zzz", read_mode)
+    self.assertFalse(return_value4)
+    self.assertTrue(source_reader.eof())
+    self.assertEqual("", source_reader.lexeme())
+    self.assertEqual(0, source_reader.lexeme_length())
+
 
 if __name__ == "__main__":
   absltest.main()

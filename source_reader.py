@@ -71,6 +71,58 @@ class SourceReader:
       if mode != ReadMode.SKIP:
         self._lexeme += current_character
 
+  def read_until_exact_match(
+      self,
+      match: str,
+      mode: ReadMode,
+  ) -> bool:
+    if len(match) == 0:
+      raise ValueError("the empty string is not a valid value for the text to match")
+    if self.marked():
+      raise RuntimeError("must not be marked when invoked")
+
+    while True:
+      self.read(
+          accepted_characters=match,
+          mode=mode,
+          max_lexeme_length=None,
+          invert_accepted_characters=True,
+      )
+
+      if self.eof():
+        return False
+
+      self.mark()
+
+      self.read(
+          accepted_characters=match,
+          mode=mode if mode != ReadMode.SKIP else ReadMode.NORMAL,
+          max_lexeme_length=len(match),
+      )
+
+      potential_match = self.lexeme()
+      if potential_match == match:
+        self.unmark()
+        if mode == ReadMode.SKIP:
+          self._lexeme = ""
+        return True
+
+      if self.eof():
+        self.unmark()
+        if mode == ReadMode.SKIP:
+          self._lexeme = ""
+        return False
+
+      self.reset()
+
+      self.read(
+          accepted_characters=match,
+          mode=mode if mode != ReadMode.SKIP else ReadMode.NORMAL,
+          max_lexeme_length=1,
+      )
+
+    return False
+
   def mark(self) -> None:
     """
     Marks the current position.
@@ -115,6 +167,9 @@ class SourceReader:
     self._lexeme = ""
     self._mark_accumulator = None
     self._eof = False
+
+  def marked(self) -> bool:
+    return self._mark_accumulator is not None
 
   class ResetCalledWithoutMarkSetError(RuntimeError):
     pass
