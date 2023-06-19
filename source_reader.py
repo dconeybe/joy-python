@@ -14,16 +14,16 @@ class SourceReader:
     self.buffer_size = buffer_size if buffer_size is not None else 1024
 
     self._buffer = ""
-    self._buffer_offset = 0
-    self._lexeme = ""
-    self._mark_accumulator: str | None = None
+    self._read_offset = 0
+    self._lexeme_offset = 0
+    self._lexeme_length = 0
     self._eof = False
 
   def lexeme(self) -> str:
-    return self._lexeme
+    return self._buffer[self._lexeme_offset : self._lexeme_offset + self._lexeme_length]
 
   def lexeme_length(self) -> int:
-    return len(self._lexeme)
+    return self._lexeme_length
 
   def eof(self) -> bool:
     return self._eof
@@ -36,9 +36,10 @@ class SourceReader:
       invert_accepted_characters: bool = False,
   ) -> None:
     if mode == ReadMode.APPEND:
-      lexeme_length = len(self._lexeme)
+      lexeme_length = self._lexeme_length
     else:
-      self._lexeme = ""
+      self._lexeme_offset = self._read_offset
+      self._lexeme_length = 0
       lexeme_length = 0
 
     while True:
@@ -46,20 +47,23 @@ class SourceReader:
         break
 
       current_character = self._peek()
-      if current_character is None:
-        return
+      if len(current_character) == 0:
+        self._eof = True
+        break
 
       if invert_accepted_characters and current_character in accepted_characters:
         break
       elif not invert_accepted_characters and current_character not in accepted_characters:
         break
 
+      # Actually _consume_ the character that we just "peeked" at.
       self._read()
-
       lexeme_length += 1
 
-      if mode != ReadMode.SKIP:
-        self._lexeme += current_character
+      if mode == ReadMode.SKIP:
+        self._lexeme_offset += 1
+      else:
+        self._lexeme_length += 1
 
   def read_until_exact_match(
       self,
@@ -68,123 +72,74 @@ class SourceReader:
   ) -> bool:
     if len(match) == 0:
       raise ValueError("the empty string is not a valid value for the text to match")
-    if self.marked():
-      raise RuntimeError("must not be marked when invoked")
+
+    if mode != ReadMode.APPEND:
+      self._lexeme_offset = self._read_offset
+      self._lexeme_length = 0
+
+    expected_character_list = list(match)
+    actual_character_list = []
 
     while True:
-      self.read(
-          accepted_characters=match,
-          mode=mode,
-          max_lexeme_length=None,
-          invert_accepted_characters=True,
-      )
-
-      if self.eof():
+      read_character = self._read()
+      if len(read_character) == 0:
         return False
 
-      self.mark()
+      if mode == ReadMode.SKIP:
+        self._lexeme_offset += 1
+      else:
+        self._lexeme_length += 1
 
-      self.read(
-          accepted_characters=match,
-          mode=mode if mode != ReadMode.SKIP else ReadMode.NORMAL,
-          max_lexeme_length=len(match),
-      )
+      actual_character_list.append(read_character)
+      if len(actual_character_list) > len(expected_character_list):
+        del actual_character_list[0]
 
-      potential_match = self.lexeme()
-      if potential_match == match:
-        self.unmark()
-        if mode == ReadMode.SKIP:
-          self._lexeme = ""
+      if actual_character_list == expected_character_list:
         return True
 
-      if self.eof():
-        self.unmark()
-        if mode == ReadMode.SKIP:
-          self._lexeme = ""
-        return False
+  def _peek(self, desired_num_characters: int | None = None) -> str:
+    return self._read(advance_read_offset=False, desired_num_characters=desired_num_characters)
 
-      self.reset()
-
-      self.read(
-          accepted_characters=match,
-          mode=mode if mode != ReadMode.SKIP else ReadMode.NORMAL,
-          max_lexeme_length=1,
+  def _read(
+      self, advance_read_offset: bool = True, desired_num_characters: int | None = None
+  ) -> str:
+    if desired_num_characters is None:
+      desired_num_characters = 1
+    if desired_num_characters < 0:
+      raise ValueError(
+          "the desired number of characters must not be negative: " f"{desired_num_characters}"
       )
 
-    return False
-
-  def mark(self) -> None:
-    """
-    Marks the current position.
-
-    A subsequent call to reset() repositions this reader at the last marked position so that
-    subsequent reads re-read the same characters.
-
-    The general contract of mark is that the stream saves all the characters read after the call to
-    mark() and stands ready to supply those same bytes again if and whenever reset() is called. It
-    is valid to call mark() even once end-of-input is reached (i.e. eof() returns True).
-
-    If a mark is already set then it is replaced by the new mark.
-    """
-    self._mark_accumulator = ""
-
-  def unmark(self) -> None:
-    """
-    Removes the mark, if set, as if mark() had never been invoked.
-    """
-    self._mark_accumulator = None
-
-  def reset(self) -> None:
-    """
-    Repositions this reader to the position at the time mark() was last called.
-
-    The stream is reset to a state such that all the characters read since the most recent call to
-    mark() will be resupplied to subsequent callers of read(), followed by any characters that
-    otherwise would have been the next input data as of the time of the call to reset().
-
-    If mark() was called at end-of-input (i.e. when eof() returned True) then reset() keeps the
-    stream at the end-of-input (i.e. it effectively does nothing but clear the mark).
-
-    Raises:
-      ResetCalledWithoutMarkSetError: if no mark is set; this could be because (a) mark() has never
-        been called, (b) because a previous invocation of reset() already "consumed" the mark, or
-        (c) unmark() was called to clear the mark.
-    """
-    if self._mark_accumulator is None:
-      raise self.ResetCalledWithoutMarkSetError("reset() called when the mark is not set")
-    self._buffer = self._mark_accumulator + self._buffer[self._buffer_offset :]
-    self._buffer_offset = 0
-    self._lexeme = ""
-    self._mark_accumulator = None
-    self._eof = False
-
-  def marked(self) -> bool:
-    return self._mark_accumulator is not None
-
-  def _peek(self) -> str | None:
-    return self._read(advance_offset=False)
-
-  def _read(self, advance_offset: bool = True) -> str | None:
     if self._eof:
-      return None
+      return ""
 
-    if self._buffer_offset == len(self._buffer):
-      self._buffer = self.f.read(self.buffer_size)
-      self._buffer_offset = 0
-      if len(self._buffer) == 0:
-        self._eof = True
-        return None
+    while self._read_offset + desired_num_characters > len(self._buffer):
+      buffer_offset = min(self._read_offset, self._lexeme_offset)
 
-    current_character = self._buffer[self._buffer_offset]
-    if advance_offset:
-      self._buffer_offset += 1
-      if self._mark_accumulator is not None:
-        self._mark_accumulator += current_character
+      self._buffer = self._buffer[buffer_offset:]
+      self._read_offset -= buffer_offset
+      self._lexeme_offset -= buffer_offset
+      del buffer_offset
 
-    return current_character
+      new_buffer = self.f.read(self.buffer_size)
+      if len(new_buffer) == 0:
+        del new_buffer
+        if advance_read_offset:
+          self._eof = True
+        break
 
-  class ResetCalledWithoutMarkSetError(RuntimeError):
-    pass
+      self._buffer += new_buffer
+      del new_buffer
+
+    if self._read_offset == len(self._buffer):
+      return ""
+
+    read_characters = self._buffer[self._read_offset : self._read_offset + desired_num_characters]
+
+    if advance_read_offset:
+      self._read_offset += len(read_characters)
+
+    return read_characters
 
 
 @enum.unique

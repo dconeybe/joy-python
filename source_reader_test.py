@@ -219,126 +219,6 @@ class SourceReaderTest(absltest.TestCase):
     self.assertFalse(source_reader.eof())
 
   @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, "aaaaaaaaaa"),
-      ("APPEND", ReadMode.APPEND, "aaaaaaaaaa"),
-      ("SKIP", ReadMode.SKIP, ""),
-  ])
-  def test_mark_on_new_instance_should_set_the_mark(
-      self, _, read_mode: ReadMode, expected_lexeme: str
-  ):
-    source_reader = SourceReader(io.StringIO("aaaaaaaaaa"), buffer_size=3)
-
-    source_reader.mark()
-
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=100)
-    self.assertEqual(expected_lexeme, source_reader.lexeme())
-    self.assertEqual(len(expected_lexeme), source_reader.lexeme_length())
-    self.assertTrue(source_reader.eof())
-
-    source_reader.reset()
-
-    self.assertEqual("", source_reader.lexeme())
-    self.assertEqual(0, source_reader.lexeme_length())
-    self.assertFalse(source_reader.eof())
-    source_reader.read(accepted_characters="a", mode=ReadMode.NORMAL, max_lexeme_length=100)
-    self.assertEqual("aaaaaaaaaa", source_reader.lexeme())
-    self.assertEqual(10, source_reader.lexeme_length())
-    self.assertTrue(source_reader.eof())
-
-  @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, "bbbbbbbbbb"),
-      ("APPEND", ReadMode.APPEND, "aaaaabbbbbbbbbb"),
-      ("SKIP", ReadMode.SKIP, ""),
-  ])
-  def test_mark_partway_through_reading_should_set_the_mark(
-      self, _, read_mode: ReadMode, expected_lexeme: str
-  ):
-    source_reader = SourceReader(io.StringIO("aaaaabbbbbbbbbbccccccc"), buffer_size=3)
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=100)
-
-    source_reader.mark()
-
-    source_reader.read(accepted_characters="b", mode=read_mode, max_lexeme_length=100)
-    self.assertEqual(expected_lexeme, source_reader.lexeme())
-    self.assertEqual(len(expected_lexeme), source_reader.lexeme_length())
-    self.assertFalse(source_reader.eof())
-
-    source_reader.reset()
-
-    self.assertEqual("", source_reader.lexeme())
-    self.assertEqual(0, source_reader.lexeme_length())
-    self.assertFalse(source_reader.eof())
-    source_reader.read(accepted_characters="bc", mode=ReadMode.NORMAL, max_lexeme_length=100)
-    self.assertEqual("bbbbbbbbbbccccccc", source_reader.lexeme())
-    self.assertEqual(17, source_reader.lexeme_length())
-    self.assertTrue(source_reader.eof())
-
-  @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL),
-      ("APPEND", ReadMode.APPEND),
-      ("SKIP", ReadMode.SKIP),
-  ])
-  def test_mark_should_reposition_an_existing_mark(self, _, read_mode: ReadMode):
-    source_reader = SourceReader(io.StringIO("aaaaabbbbbbbbbbcccccccddddddddd"), buffer_size=3)
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=100)
-
-    source_reader.mark()
-
-    source_reader.read(accepted_characters="b", mode=read_mode, max_lexeme_length=100)
-
-    source_reader.mark()
-
-    source_reader.read(accepted_characters="c", mode=read_mode, max_lexeme_length=100)
-
-    source_reader.reset()
-
-    self.assertEqual("", source_reader.lexeme())
-    self.assertEqual(0, source_reader.lexeme_length())
-    self.assertFalse(source_reader.eof())
-    source_reader.read(accepted_characters="cd", mode=ReadMode.NORMAL, max_lexeme_length=100)
-    self.assertEqual("cccccccddddddddd", source_reader.lexeme())
-    self.assertEqual(16, source_reader.lexeme_length())
-    self.assertTrue(source_reader.eof())
-
-  @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, "aaaaabbbbbbbbbb"),
-      ("APPEND", ReadMode.APPEND, "aaaaabbbbbbbbbb"),
-      ("SKIP", ReadMode.SKIP, ""),
-  ])
-  def test_unmark_should_do_nothing_when_called_on_new_instance(
-      self, _, read_mode: ReadMode, expected_lexeme: str
-  ):
-    source_reader = SourceReader(io.StringIO("aaaaabbbbbbbbbbcccccccddddddddd"), buffer_size=3)
-
-    source_reader.unmark()
-    source_reader.unmark()
-
-    source_reader.read(accepted_characters="ab", mode=read_mode, max_lexeme_length=100)
-    self.assertEqual(source_reader.lexeme(), expected_lexeme)
-
-  def test_reset_should_raise_on_new_instance(self):
-    source_reader = SourceReader(io.StringIO())
-
-    with self.assertRaises(source_reader.ResetCalledWithoutMarkSetError):
-      source_reader.reset()
-
-  def test_reset_should_raise_if_unmark_cleared_the_mark(self):
-    source_reader = SourceReader(io.StringIO())
-    source_reader.mark()
-    source_reader.unmark()
-
-    with self.assertRaises(source_reader.ResetCalledWithoutMarkSetError):
-      source_reader.reset()
-
-  def test_reset_should_raise_if_called_multiple_times_in_a_row(self):
-    source_reader = SourceReader(io.StringIO())
-    source_reader.mark()
-    source_reader.reset()
-
-    with self.assertRaises(source_reader.ResetCalledWithoutMarkSetError):
-      source_reader.reset()
-
-  @parameterized.parameterized.expand([
       ("NORMAL", ReadMode.NORMAL),
       ("APPEND", ReadMode.APPEND),
       ("SKIP", ReadMode.SKIP),
@@ -351,21 +231,6 @@ class SourceReaderTest(absltest.TestCase):
 
     exception_message = str(assert_raises_context.exception)
     self.assertIn("empty string", exception_message.lower())
-
-  @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL),
-      ("APPEND", ReadMode.APPEND),
-      ("SKIP", ReadMode.SKIP),
-  ])
-  def test_read_until_exact_match_when_marked_should_raise(self, _, read_mode: ReadMode):
-    source_reader = SourceReader(io.StringIO("abc"))
-    source_reader.mark()
-
-    with self.assertRaises(RuntimeError) as assert_raises_context:
-      source_reader.read_until_exact_match("abc", read_mode)
-
-    exception_message = str(assert_raises_context.exception)
-    self.assertIn("not be marked", exception_message.lower())
 
   @parameterized.parameterized.expand([
       ("NORMAL", ReadMode.NORMAL),
@@ -400,9 +265,18 @@ class SourceReaderTest(absltest.TestCase):
     self.assertEqual(len(expected_lexeme), source_reader.lexeme_length())
 
   @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, ["aaa bbb", " ccc ddd eee f", "ff ggg"]),
-      ("APPEND", ReadMode.APPEND, "aaabCzza  bc\nbca\r\n\t"),
-      ("SKIP", ReadMode.SKIP, ""),
+      ("NORMAL", ReadMode.NORMAL, ["aaa bbb", " ccc ddd eee f", "ff ggg", ""]),
+      (
+          "APPEND",
+          ReadMode.APPEND,
+          [
+              "aaa bbb",
+              "aaa bbb ccc ddd eee f",
+              "aaa bbb ccc ddd eee fff ggg",
+              "aaa bbb ccc ddd eee fff ggg",
+          ],
+      ),
+      ("SKIP", ReadMode.SKIP, ["", "", "", ""]),
   ])
   def test_read_until_exact_match_with_match_in_the_middle(
       self, _, read_mode: ReadMode, expected_lexemes: list[str]
@@ -430,8 +304,8 @@ class SourceReaderTest(absltest.TestCase):
     return_value4 = source_reader.read_until_exact_match("zzz", read_mode)
     self.assertFalse(return_value4)
     self.assertTrue(source_reader.eof())
-    self.assertEqual("", source_reader.lexeme())
-    self.assertEqual(0, source_reader.lexeme_length())
+    self.assertEqual(expected_lexemes[3], source_reader.lexeme())
+    self.assertEqual(len(expected_lexemes[3]), source_reader.lexeme_length())
 
 
 if __name__ == "__main__":
