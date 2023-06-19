@@ -41,25 +41,25 @@ class SourceReaderTest(absltest.TestCase):
     self.assertEqual(source_reader.lexeme(), "")
 
   @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, "abcdef"),
-      ("APPEND", ReadMode.APPEND, "abcdef"),
-      ("SKIP", ReadMode.SKIP, ""),
+      ("NORMAL", ReadMode.NORMAL, "abcdef", ""),
+      ("APPEND", ReadMode.APPEND, "abcdef", "abcdef"),
+      ("SKIP", ReadMode.SKIP, "", ""),
   ])
   def test_read_to_eof_should_enter_and_remain_in_eof_state(
-      self, _, read_mode: ReadMode, expected_lexeme: str
+      self, _, read_mode: ReadMode, expected_lexeme1: str, expected_lexeme2: str
   ):
     source_reader = SourceReader(io.StringIO("abcdef"))
 
     source_reader.read(accepted_characters="abcdef", mode=read_mode, max_lexeme_length=100)
     self.assertTrue(source_reader.eof())
-    self.assertEqual(expected_lexeme, source_reader.lexeme())
+    self.assertEqual(expected_lexeme1, source_reader.lexeme())
 
     source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
     self.assertTrue(source_reader.eof())
-    self.assertEqual(expected_lexeme, source_reader.lexeme())
+    self.assertEqual(expected_lexeme2, source_reader.lexeme())
     source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
     self.assertTrue(source_reader.eof())
-    self.assertEqual(expected_lexeme, source_reader.lexeme())
+    self.assertEqual(expected_lexeme2, source_reader.lexeme())
 
   @parameterized.parameterized.expand([
       ("NORMAL", ReadMode.NORMAL, ("aaa", "bbb", "ccc")),
@@ -115,9 +115,13 @@ class SourceReaderTest(absltest.TestCase):
     self.assertTrue(source_reader.eof())
 
   @parameterized.parameterized.expand([
-      ("NORMAL", ReadMode.NORMAL, ("aaaXXXccc", "YYY", "ddd")),
-      ("APPEND", ReadMode.APPEND, ("aaaXXXccc", "aaaXXXcccYYY", "aaaXXXcccYYYddd")),
-      ("SKIP", ReadMode.SKIP, ("", "", "")),
+      ("NORMAL", ReadMode.NORMAL, ("aaaXXXccc", "YYY", "ddd", "")),
+      (
+          "APPEND",
+          ReadMode.APPEND,
+          ("aaaXXXccc", "aaaXXXcccYYY", "aaaXXXcccYYYddd", "aaaXXXcccYYYddd"),
+      ),
+      ("SKIP", ReadMode.SKIP, ("", "", "", "")),
   ])
   def test_read_when_lexeme_spans_buffer_sizes(
       self, _, read_mode: ReadMode, expected_lexemes: tuple[str]
@@ -137,7 +141,7 @@ class SourceReaderTest(absltest.TestCase):
     self.assertTrue(source_reader.eof())
 
     source_reader.read(accepted_characters="acdXY", mode=read_mode, max_lexeme_length=100)
-    self.assertEqual(expected_lexemes[2], source_reader.lexeme())
+    self.assertEqual(expected_lexemes[3], source_reader.lexeme())
     self.assertTrue(source_reader.eof())
 
   def test_read_when_lexeme_spans_buffer_sizes_complex_test(self):
