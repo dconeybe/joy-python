@@ -35,9 +35,6 @@ class SourceReader:
       max_lexeme_length: int | None,
       invert_accepted_characters: bool = False,
   ) -> None:
-    if self._eof:
-      return
-
     if mode == ReadMode.APPEND:
       lexeme_length = len(self._lexeme)
     else:
@@ -48,25 +45,18 @@ class SourceReader:
       if max_lexeme_length is not None and lexeme_length >= max_lexeme_length:
         break
 
-      if self._buffer_offset == len(self._buffer):
-        self._buffer = self.f.read(self.buffer_size)
-        self._buffer_offset = 0
-        if len(self._buffer) == 0:
-          self._eof = True
-          break
-
-      current_character = self._buffer[self._buffer_offset]
+      current_character = self._peek()
+      if current_character is None:
+        return
 
       if invert_accepted_characters and current_character in accepted_characters:
         break
       elif not invert_accepted_characters and current_character not in accepted_characters:
         break
 
-      self._buffer_offset += 1
-      lexeme_length += 1
+      self._read()
 
-      if self._mark_accumulator is not None:
-        self._mark_accumulator += current_character
+      lexeme_length += 1
 
       if mode != ReadMode.SKIP:
         self._lexeme += current_character
@@ -115,6 +105,28 @@ class SourceReader:
     self._lexeme = ""
     self._mark_accumulator = None
     self._eof = False
+
+  def _peek(self) -> str | None:
+    return self._read(advance_offset=False)
+
+  def _read(self, advance_offset: bool = True) -> str | None:
+    if self._eof:
+      return None
+
+    if self._buffer_offset == len(self._buffer):
+      self._buffer = self.f.read(self.buffer_size)
+      self._buffer_offset = 0
+      if len(self._buffer) == 0:
+        self._eof = True
+        return None
+
+    current_character = self._buffer[self._buffer_offset]
+    if advance_offset:
+      self._buffer_offset += 1
+      if self._mark_accumulator is not None:
+        self._mark_accumulator += current_character
+
+    return current_character
 
   class ResetCalledWithoutMarkSetError(RuntimeError):
     pass
