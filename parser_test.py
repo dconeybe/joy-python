@@ -33,6 +33,27 @@ class ParserTest(absltest.TestCase):
         parser.functions,
     )
 
+  def test_parse_annotatedfunctions(self):
+    parser = self.create_parser(
+        """
+          @main
+          function abc
+          @abc function def @def @ghi @jkl
+          function _12
+        """
+    )
+
+    parser.parse()
+
+    self.assertEqual(
+        [
+            JoyFunction(name="abc", annotations=("main",)),
+            JoyFunction(name="def", annotations=("abc",)),
+            JoyFunction(name="_12", annotations=("def", "ghi", "jkl")),
+        ],
+        parser.functions,
+    )
+
   def create_tokenizer(self, text: str) -> Tokenizer:
     return Tokenizer(source_reader=SourceReader(io.StringIO(text)))
 
