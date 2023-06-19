@@ -62,6 +62,9 @@ class Tokenizer:
 
   def _skip_whitespace_and_comments(self) -> None:
     while True:
+      if self.source_reader.eof():
+        break
+
       # Skip whitespace.
       self.source_reader.read(
           accepted_characters=_WHITESPACE_CHARS,
@@ -69,64 +72,20 @@ class Tokenizer:
           max_lexeme_length=None,
       )
 
-      # Read the next two characters, which potentially start a comment
-      self.source_reader.mark()
-      self.source_reader.read(
-          accepted_characters="/*",
-          mode=source_reader_module.ReadMode.NORMAL,
-          max_lexeme_length=2,
-      )
-
-      # If a comment is starting, then skip it; otherwise, we're done.
-      match self.source_reader.lexeme():
+      # If a comment is starting, then skip it.
+      potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
+      match potential_comment_starter:
         case "//":
-          self.source_reader.unmark()
-          self._skip_inline_comment()
+          self.source_reader.read(
+              accepted_characters="\r\n",
+              mode=source_reader_module.ReadMode.SKIP,
+              max_lexeme_length=None,
+              invert_accepted_characters=True,
+          )
         case "/*":
-          self.source_reader.unmark()
-          self._skip_multiline_comment()
+          self.source_reader.read_until_exact_match("*/", mode=source_reader_module.ReadMode.SKIP)
         case _:
-          self.source_reader.reset()
           break
-
-  def _skip_inline_comment(self) -> None:
-    self.source_reader.read(
-        accepted_characters="\r\n",
-        mode=source_reader_module.ReadMode.SKIP,
-        max_lexeme_length=None,
-        invert_accepted_characters=True,
-    )
-
-  def _skip_multiline_comment(self) -> None:
-    while True:
-      self.source_reader.read(
-          accepted_characters="*",
-          mode=source_reader_module.ReadMode.SKIP,
-          max_lexeme_length=None,
-          invert_accepted_characters=True,
-      )
-
-      self.source_reader.read(
-          accepted_characters="*",
-          mode=source_reader_module.ReadMode.NORMAL,
-          max_lexeme_length=1,
-      )
-
-      self.source_reader.mark()
-      self.source_reader.read(
-          accepted_characters="/",
-          mode=source_reader_module.ReadMode.NORMAL,
-          max_lexeme_length=1,
-      )
-
-      if self.source_reader.lexeme() == "/":
-        self.source_reader.unmark()
-        break
-
-      if self.source_reader.eof():
-        raise self.UnterminatedMultiLineCommentError()
-
-      self.source_reader.reset()
 
   class ParseError(Exception):
     pass
