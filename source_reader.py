@@ -46,7 +46,7 @@ class SourceReader:
       if max_lexeme_length is not None and lexeme_length >= max_lexeme_length:
         break
 
-      current_character = self._peek()
+      current_character = self.peek()
       if len(current_character) == 0:
         self._eof = True
         break
@@ -97,7 +97,7 @@ class SourceReader:
       if actual_character_list == expected_character_list:
         return True
 
-  def _peek(self, desired_num_characters: int | None = None) -> str:
+  def peek(self, desired_num_characters: int | None = None) -> str:
     return self._read(advance_read_offset=False, desired_num_characters=desired_num_characters)
 
   def _read(
