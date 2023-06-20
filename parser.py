@@ -31,8 +31,24 @@ class Parser:
     parser.close()
 
   def _parse(self) -> Generator[None, None, None]:
+    accumulated_annotations: list[str] = []
+
     while True:
-      yield
+      try:
+        yield
+      except GeneratorExit:
+        if len(accumulated_annotations) > 0:
+          raise self.ParseError(
+              "end-of-file reached unexpectedly after annotations: "
+              f"{' ,'.join(accumulated_annotations)}"
+          )
+        raise
+
+      annotation = self.tokenizer.read_annotation()
+      if annotation is not None:
+        accumulated_annotations.append(annotation)
+        continue
+
       identifier = self.tokenizer.read_identifier()
       if identifier is None:
         raise self.ParseError("expected function declaration")
@@ -46,7 +62,10 @@ class Parser:
       except GeneratorExit:
         raise self.ParseError("end-of-file reached unexpectedly in function definition")
 
-      self.functions.append(JoyFunction(name=function_name, annotations=tuple()))
+      self.functions.append(
+          JoyFunction(name=function_name, annotations=tuple(accumulated_annotations))
+      )
+      accumulated_annotations = []
 
   class ParseError(Exception):
     pass
