@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 import dataclasses
 
 import tokenizer as tokenizer_module
@@ -12,32 +13,40 @@ class Parser:
     self.functions: list[JoyFunction] = []
 
   def parse(self) -> None:
-    state = "top"
-    function_name = ""
-    accumulated_annotations: list[str] = []
+    parser = self._parse()
 
     while True:
       if self.tokenizer.eof():
         break
 
-      self.tokenizer.skip_whitespace()
-      self.tokenizer.skip_inline_comment()
-      self.tokenizer.skip_multiline_comment()
+      if self.tokenizer.skip_whitespace():
+        continue
+      if self.tokenizer.skip_inline_comment():
+        continue
+      if self.tokenizer.skip_multiline_comment():
+        continue
 
-      match state:
-        case "top":
-          identifier = self.tokenizer.read_identifier()
-          if identifier == "function":
-            state = "function_name"
-          elif identifier is not None:
-            raise self.ParseError(f"expected 'function' but got {identifier}")
-          del identifier
-        case "function_name":
-          function_name = self.tokenizer.read_identifier()
-          if function_name is None:
-            raise self.ParseError("expected a function name following the 'function' keyword")
-          self.functions.append(JoyFunction(name=function_name, annotations=tuple()))
-          state = "top"
+      parser.send(None)
+
+    parser.close()
+
+  def _parse(self) -> Generator[None, None, None]:
+    while True:
+      yield
+      identifier = self.tokenizer.read_identifier()
+      if identifier is None:
+        raise self.ParseError("expected function declaration")
+      if identifier != "function":
+        raise self.ParseError(f"expected `function` but got {identifier}")
+      try:
+        yield
+        function_name = self.tokenizer.read_identifier()
+        if function_name is None:
+          raise self.ParseError("expected function name after `function` keyword")
+      except GeneratorExit:
+        raise self.ParseError("end-of-file reached unexpectedly in function definition")
+
+      self.functions.append(JoyFunction(name=function_name, annotations=tuple()))
 
   class ParseError(Exception):
     pass

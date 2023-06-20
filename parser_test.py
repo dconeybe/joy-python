@@ -29,7 +29,11 @@ class ParserTest(absltest.TestCase):
     parser.parse()
 
     self.assertEqual(
-        [JoyFunction(name="abc"), JoyFunction(name="def"), JoyFunction(name="_12")],
+        [
+            JoyFunction(name="abc", annotations=tuple()),
+            JoyFunction(name="def", annotations=tuple()),
+            JoyFunction(name="_12", annotations=tuple()),
+        ],
         parser.functions,
     )
 
