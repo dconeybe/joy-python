@@ -16,9 +16,20 @@ class Tokenizer:
   def eof(self) -> bool:
     return self.source_reader.eof()
 
-  def read_identifier(self) -> str | None:
-    self._skip_whitespace_and_comments()
+  def read_annotation(self) -> str | None:
+    self.source_reader.read(
+        accepted_characters="@",
+        mode=source_reader_module.ReadMode.NORMAL,
+        max_lexeme_length=1,
+    )
+    if self.source_reader.lexeme_length() == 0:
+      return None
+    annotation_name = self.read_identifier()
+    if annotation_name is None:
+      raise self.ParseError("expected annotation name after @")
+    return annotation_name
 
+  def read_identifier(self) -> str | None:
     # Read the first character(s) of an identifier
     self.source_reader.read(
         accepted_characters=_IDENTIFIER_START_CHARS,
@@ -26,24 +37,10 @@ class Tokenizer:
         max_lexeme_length=1,
     )
 
-    # Fail if an invalid identifier start character was encountered.
     if self.source_reader.lexeme_length() == 0:
-      if self.source_reader.eof():
-        return None
+      return None
 
-      self.source_reader.read(
-          accepted_characters=_WHITESPACE_CHARS,
-          mode=source_reader_module.ReadMode.NORMAL,
-          max_lexeme_length=20,
-          invert_accepted_characters=True,
-      )
-      invalid_identifer = self.source_reader.lexeme()
-      raise self.InvalidIdentifierError(
-          identifier=invalid_identifer,
-          message=f"invalid identifier: {self.source_reader.lexeme()}",
-      )
-
-    # Read the subsequent character(s) of an identifier
+    # Read the subsequent character(s) of the identifier
     self.source_reader.read(
         accepted_characters=_IDENTIFIER_SUBSEQUENT_CHARS,
         mode=source_reader_module.ReadMode.APPEND,
@@ -60,32 +57,34 @@ class Tokenizer:
 
     return identifier
 
-  def _skip_whitespace_and_comments(self) -> None:
-    while True:
-      if self.source_reader.eof():
-        break
+  def skip_whitespace(self) -> bool:
+    character_read_count = self.source_reader.read(
+        accepted_characters=_WHITESPACE_CHARS,
+        mode=source_reader_module.ReadMode.SKIP,
+        max_lexeme_length=None,
+    )
+    return character_read_count > 0
 
-      # Skip whitespace.
-      self.source_reader.read(
-          accepted_characters=_WHITESPACE_CHARS,
-          mode=source_reader_module.ReadMode.SKIP,
-          max_lexeme_length=None,
-      )
+  def skip_inline_comment(self) -> bool:
+    potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
+    if potential_comment_starter != "//":
+      return False
 
-      # If a comment is starting, then skip it.
-      potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
-      match potential_comment_starter:
-        case "//":
-          self.source_reader.read(
-              accepted_characters="\r\n",
-              mode=source_reader_module.ReadMode.SKIP,
-              max_lexeme_length=None,
-              invert_accepted_characters=True,
-          )
-        case "/*":
-          self.source_reader.read_until_exact_match("*/", mode=source_reader_module.ReadMode.SKIP)
-        case _:
-          break
+    self.source_reader.read(
+        accepted_characters="\r\n",
+        mode=source_reader_module.ReadMode.SKIP,
+        max_lexeme_length=None,
+        invert_accepted_characters=True,
+    )
+    return True
+
+  def skip_multiline_comment(self) -> bool:
+    potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
+    if potential_comment_starter != "/*":
+      return False
+
+    self.source_reader.read_until_exact_match("*/", mode=source_reader_module.ReadMode.SKIP)
+    return True
 
   class ParseError(Exception):
     pass

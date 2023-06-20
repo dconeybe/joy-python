@@ -29,7 +29,36 @@ class ParserTest(absltest.TestCase):
     parser.parse()
 
     self.assertEqual(
-        [JoyFunction(name="abc"), JoyFunction(name="def"), JoyFunction(name="_12")],
+        [
+            JoyFunction(name="abc", annotations=tuple()),
+            JoyFunction(name="def", annotations=tuple()),
+            JoyFunction(name="_12", annotations=tuple()),
+        ],
+        parser.functions,
+    )
+
+  def test_parse_function_annotations(self):
+    parser = self.create_parser(
+        """
+          @main
+          function aaa
+          @abc function def @def @ghi @jkl
+          function _12
+          @zzz // an interleaving inline coment
+          @yyy /* an interleaving multiline comment
+          */function bbb
+        """
+    )
+
+    parser.parse()
+
+    self.assertEqual(
+        [
+            JoyFunction(name="aaa", annotations=("main",)),
+            JoyFunction(name="def", annotations=("abc",)),
+            JoyFunction(name="_12", annotations=("def", "ghi", "jkl")),
+            JoyFunction(name="bbb", annotations=("zzz", "yyy")),
+        ],
         parser.functions,
     )
 
