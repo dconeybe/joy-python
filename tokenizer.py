@@ -16,6 +16,19 @@ class Tokenizer:
   def eof(self) -> bool:
     return self.source_reader.eof()
 
+  def read_annotation(self) -> str | None:
+    self.source_reader.read(
+        accepted_characters="@",
+        mode=source_reader_module.ReadMode.NORMAL,
+        max_lexeme_length=1,
+    )
+    if self.source_reader.lexeme_length() == 0:
+      return None
+    annotation_name = self.read_identifier()
+    if annotation_name is None:
+      raise self.ParseError("expected annotation name after @")
+    return annotation_name
+
   def read_identifier(self) -> str | None:
     # Read the first character(s) of an identifier
     self.source_reader.read(

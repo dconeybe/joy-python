@@ -220,6 +220,47 @@ class TokenizerTest(absltest.TestCase):
     self.assertTrue(return_value)
     self.assertEqual("abc", tokenizer.read_identifier())
 
+  def test_read_annotation_on_empty_file(self):
+    tokenizer = self.create_tokenizer("")
+
+    return_value = tokenizer.read_annotation()
+
+    self.assertIsNone(return_value)
+
+  def test_read_annotation_on_file_containing_only_an_annotation(self):
+    tokenizer = self.create_tokenizer("@abc")
+
+    return_value = tokenizer.read_annotation()
+
+    self.assertEqual("abc", return_value)
+
+  def test_read_annotation_when_not_at_an_annotation(self):
+    tokenizer = self.create_tokenizer("abc")
+
+    return_value = tokenizer.read_annotation()
+
+    self.assertIsNone(return_value)
+
+  def test_read_annotation_when_file_ends_after_the_at_symbol(self):
+    tokenizer = self.create_tokenizer("@")
+
+    with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
+      tokenizer.read_annotation()
+
+    exception_message = str(assert_raises_context.exception)
+    self.assertIn("expected annotation", exception_message.lower())
+    self.assertIn("@", exception_message)
+
+  def test_read_annotation_when_non_identifier_follows_the_at_symbol(self):
+    tokenizer = self.create_tokenizer("@123")
+
+    with self.assertRaises(tokenizer.ParseError) as assert_raises_context:
+      tokenizer.read_annotation()
+
+    exception_message = str(assert_raises_context.exception)
+    self.assertIn("expected annotation", exception_message.lower())
+    self.assertIn("@", exception_message)
+
   def create_tokenizer(self, text: str) -> Tokenizer:
     return Tokenizer(source_reader=source_reader_module.SourceReader(io.StringIO(text)))
 
