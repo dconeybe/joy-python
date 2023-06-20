@@ -13,6 +13,7 @@ class SourceReader:
     self.f = f
     self.buffer_size = buffer_size if buffer_size is not None else 1024
 
+    self._position = 0
     self._buffer = ""
     self._read_offset = 0
     self._lexeme_offset = 0
@@ -24,6 +25,9 @@ class SourceReader:
 
   def lexeme_length(self) -> int:
     return self._lexeme_length
+
+  def position(self) -> int:
+    return self._position
 
   def eof(self) -> bool:
     return self._eof
@@ -48,7 +52,7 @@ class SourceReader:
 
       current_character = self.peek()
       if len(current_character) == 0:
-        self._eof = True
+        self._read()
         break
 
       if invert_accepted_characters and current_character in accepted_characters:
@@ -138,6 +142,7 @@ class SourceReader:
 
     if advance_read_offset:
       self._read_offset += len(read_characters)
+      self._position += len(read_characters)
 
     return read_characters
 
