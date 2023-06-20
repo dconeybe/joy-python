@@ -38,7 +38,7 @@ class SourceReader:
       mode: ReadMode,
       max_lexeme_length: int | None,
       invert_accepted_characters: bool = False,
-  ) -> None:
+  ) -> int:
     if mode == ReadMode.APPEND:
       lexeme_length = self._lexeme_length
     else:
@@ -46,6 +46,7 @@ class SourceReader:
       self._lexeme_length = 0
       lexeme_length = 0
 
+    character_read_count = 0
     while True:
       if max_lexeme_length is not None and lexeme_length >= max_lexeme_length:
         break
@@ -63,11 +64,14 @@ class SourceReader:
       # Actually _consume_ the character that we just "peeked" at.
       self._read()
       lexeme_length += 1
+      character_read_count += 1
 
       if mode == ReadMode.SKIP:
         self._lexeme_offset += 1
       else:
         self._lexeme_length += 1
+
+    return character_read_count
 
   def read_until_exact_match(
       self,

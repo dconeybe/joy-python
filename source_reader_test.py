@@ -28,8 +28,9 @@ class SourceReaderTest(absltest.TestCase):
   def test_read_on_empty_file_should_immediately_enter_eof_state(self, _, read_mode: ReadMode):
     source_reader = SourceReader(io.StringIO())
 
-    source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
+    return_value = source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
 
+    self.assertEqual(0, return_value)
     self.assertSourceReaderState(source_reader, lexeme="", position=0, eof=True)
 
   @parameterized.parameterized.expand([
@@ -42,12 +43,22 @@ class SourceReaderTest(absltest.TestCase):
   ):
     source_reader = SourceReader(io.StringIO("abcdef"))
 
-    source_reader.read(accepted_characters="abcdef", mode=read_mode, max_lexeme_length=100)
+    return_value1 = source_reader.read(
+        accepted_characters="abcdef", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(6, return_value1)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme1, position=6, eof=True)
 
-    source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
+    return_value2 = source_reader.read(
+        accepted_characters="", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(0, return_value2)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme2, position=6, eof=True)
-    source_reader.read(accepted_characters="", mode=read_mode, max_lexeme_length=100)
+
+    return_value3 = source_reader.read(
+        accepted_characters="", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(0, return_value3)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme2, position=6, eof=True)
 
   @parameterized.parameterized.expand([
@@ -58,13 +69,22 @@ class SourceReaderTest(absltest.TestCase):
   def test_read_consecutive_calls(self, _, read_mode: ReadMode, expected_lexemes: tuple[str]):
     source_reader = SourceReader(io.StringIO("aaabbbccc"))
 
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=100)
+    return_value1 = source_reader.read(
+        accepted_characters="a", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(3, return_value1)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[0], position=3, eof=False)
 
-    source_reader.read(accepted_characters="b", mode=read_mode, max_lexeme_length=100)
+    return_value2 = source_reader.read(
+        accepted_characters="b", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(3, return_value2)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[1], position=6, eof=False)
 
-    source_reader.read(accepted_characters="c", mode=read_mode, max_lexeme_length=100)
+    return_value3 = source_reader.read(
+        accepted_characters="c", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(3, return_value3)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[2], position=9, eof=True)
 
   @parameterized.parameterized.expand([
@@ -77,22 +97,34 @@ class SourceReaderTest(absltest.TestCase):
   ):
     source_reader = SourceReader(io.StringIO("aaabbbcccdddeee"))
 
-    source_reader.read(accepted_characters="abcde", mode=read_mode, max_lexeme_length=5)
+    return_value1 = source_reader.read(
+        accepted_characters="abcde", mode=read_mode, max_lexeme_length=5
+    )
+    self.assertEqual(expected_positions[0], return_value1)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[0], position=expected_positions[0], eof=False
     )
 
-    source_reader.read(accepted_characters="abcde", mode=read_mode, max_lexeme_length=5)
+    return_value2 = source_reader.read(
+        accepted_characters="abcde", mode=read_mode, max_lexeme_length=5
+    )
+    self.assertEqual(expected_positions[1] - expected_positions[0], return_value2)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[1], position=expected_positions[1], eof=False
     )
 
-    source_reader.read(accepted_characters="abcde", mode=read_mode, max_lexeme_length=5)
+    return_value3 = source_reader.read(
+        accepted_characters="abcde", mode=read_mode, max_lexeme_length=5
+    )
+    self.assertEqual(expected_positions[2] - expected_positions[1], return_value3)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[2], position=expected_positions[2], eof=False
     )
 
-    source_reader.read(accepted_characters="abcde", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    return_value4 = source_reader.read(
+        accepted_characters="abcde", mode=ReadMode.NORMAL, max_lexeme_length=100
+    )
+    self.assertEqual(expected_positions[3] - expected_positions[2], return_value4)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[3], position=expected_positions[3], eof=True
     )
@@ -100,7 +132,10 @@ class SourceReaderTest(absltest.TestCase):
   def test_read_when_lexeme_spans_buffer_sizes_basic_test(self):
     source_reader = SourceReader(io.StringIO("aaaXXXcccYYYddd"), buffer_size=5)
 
-    source_reader.read(accepted_characters="abcdXY", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    return_value = source_reader.read(
+        accepted_characters="abcdXY", mode=ReadMode.NORMAL, max_lexeme_length=100
+    )
+    self.assertEqual(15, return_value)
     self.assertSourceReaderState(source_reader, lexeme="aaaXXXcccYYYddd", position=15, eof=True)
 
   @parameterized.parameterized.expand([
@@ -117,36 +152,69 @@ class SourceReaderTest(absltest.TestCase):
   ):
     source_reader = SourceReader(io.StringIO("aaaXXXcccYYYddd"), buffer_size=5)
 
-    source_reader.read(accepted_characters="aXc", mode=read_mode, max_lexeme_length=100)
+    return_value1 = source_reader.read(
+        accepted_characters="aXc", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value1)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[0], position=9, eof=False)
 
-    source_reader.read(accepted_characters="Y", mode=read_mode, max_lexeme_length=100)
+    return_value2 = source_reader.read(
+        accepted_characters="Y", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(3, return_value2)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[1], position=12, eof=False)
 
-    source_reader.read(accepted_characters="d", mode=read_mode, max_lexeme_length=100)
+    return_value3 = source_reader.read(
+        accepted_characters="d", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(3, return_value3)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[2], position=15, eof=True)
 
-    source_reader.read(accepted_characters="acdXY", mode=read_mode, max_lexeme_length=100)
+    return_value4 = source_reader.read(
+        accepted_characters="acdXY", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(0, return_value4)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[3], position=15, eof=True)
 
   def test_read_when_lexeme_spans_buffer_sizes_complex_test(self):
     source_reader = SourceReader(io.StringIO("aaaXXXcccYYY" * 100), buffer_size=3)
 
-    source_reader.read(accepted_characters="aXc", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    return_value1 = source_reader.read(
+        accepted_characters="aXc", mode=ReadMode.NORMAL, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value1)
     self.assertSourceReaderState(source_reader, lexeme="aaaXXXccc", position=9, eof=False)
-    source_reader.read(accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100)
+    return_value2 = source_reader.read(
+        accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value2)
     self.assertSourceReaderState(source_reader, lexeme="aaaXXXcccYYYaaaXXX", position=18, eof=False)
-    source_reader.read(accepted_characters="cYa", mode=ReadMode.APPEND, max_lexeme_length=100)
+    return_value3 = source_reader.read(
+        accepted_characters="cYa", mode=ReadMode.APPEND, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value3)
     self.assertSourceReaderState(
         source_reader, lexeme="aaaXXXcccYYYaaaXXXcccYYYaaa", position=27, eof=False
     )
-    source_reader.read(accepted_characters="Xc", mode=ReadMode.SKIP, max_lexeme_length=100)
+    return_value4 = source_reader.read(
+        accepted_characters="Xc", mode=ReadMode.SKIP, max_lexeme_length=100
+    )
+    self.assertEqual(6, return_value4)
     self.assertSourceReaderState(source_reader, lexeme="", position=33, eof=False)
-    source_reader.read(accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100)
+    return_value5 = source_reader.read(
+        accepted_characters="YaX", mode=ReadMode.APPEND, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value5)
     self.assertSourceReaderState(source_reader, lexeme="YYYaaaXXX", position=42, eof=False)
-    source_reader.read(accepted_characters="cYa", mode=ReadMode.NORMAL, max_lexeme_length=100)
+    return_value6 = source_reader.read(
+        accepted_characters="cYa", mode=ReadMode.NORMAL, max_lexeme_length=100
+    )
+    self.assertEqual(9, return_value6)
     self.assertSourceReaderState(source_reader, lexeme="cccYYYaaa", position=51, eof=False)
-    source_reader.read(accepted_characters="acXY", mode=ReadMode.SKIP, max_lexeme_length=10000)
+    return_value7 = source_reader.read(
+        accepted_characters="acXY", mode=ReadMode.SKIP, max_lexeme_length=10000
+    )
+    self.assertEqual(1149, return_value7)
     self.assertSourceReaderState(source_reader, lexeme="", position=1200, eof=True)
 
   @parameterized.parameterized.expand([
@@ -159,17 +227,26 @@ class SourceReaderTest(absltest.TestCase):
   ):
     source_reader = SourceReader(io.StringIO("aaaXXXcccYYY" * 100), buffer_size=2)
 
-    source_reader.read(accepted_characters="aXc", mode=read_mode, max_lexeme_length=8)
+    return_value1 = source_reader.read(
+        accepted_characters="aXc", mode=read_mode, max_lexeme_length=8
+    )
+    self.assertEqual(expected_positions[0], return_value1)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[0], position=expected_positions[0], eof=False
     )
 
-    source_reader.read(accepted_characters="cY", mode=read_mode, max_lexeme_length=3)
+    return_value2 = source_reader.read(
+        accepted_characters="cY", mode=read_mode, max_lexeme_length=3
+    )
+    self.assertEqual(expected_positions[1] - expected_positions[0], return_value2)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[1], position=expected_positions[1], eof=False
     )
 
-    source_reader.read(accepted_characters="cYaX", mode=read_mode, max_lexeme_length=17)
+    return_value3 = source_reader.read(
+        accepted_characters="cYaX", mode=read_mode, max_lexeme_length=17
+    )
+    self.assertEqual(expected_positions[2] - expected_positions[1], return_value3)
     self.assertSourceReaderState(
         source_reader, lexeme=expected_lexemes[2], position=expected_positions[2], eof=False
     )
@@ -182,28 +259,31 @@ class SourceReaderTest(absltest.TestCase):
   def test_invert_accepted_characters(self, _, read_mode: ReadMode, expected_lexemes: tuple[str]):
     source_reader = SourceReader(io.StringIO("aaaXXXbbbYYYcccZZZ"))
 
-    source_reader.read(
+    return_value1 = source_reader.read(
         accepted_characters="X",
         mode=read_mode,
         max_lexeme_length=100,
         invert_accepted_characters=True,
     )
+    self.assertEqual(3, return_value1)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[0], position=3, eof=False)
 
-    source_reader.read(
+    return_value2 = source_reader.read(
         accepted_characters="Y",
         mode=read_mode,
         max_lexeme_length=100,
         invert_accepted_characters=True,
     )
+    self.assertEqual(6, return_value2)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[1], position=9, eof=False)
 
-    source_reader.read(
+    return_value3 = source_reader.read(
         accepted_characters="Z",
         mode=read_mode,
         max_lexeme_length=100,
         invert_accepted_characters=True,
     )
+    self.assertEqual(6, return_value3)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[2], position=15, eof=False)
 
   @parameterized.parameterized.expand([
@@ -291,11 +371,14 @@ class SourceReaderTest(absltest.TestCase):
   def test_peek_on_new_instance(self, _, read_mode: ReadMode, expected_lexeme: str):
     source_reader = SourceReader(io.StringIO("abcdefg"), buffer_size=3)
 
-    return_value = source_reader.peek(7)
+    peek_return_value = source_reader.peek(7)
 
-    self.assertEqual("abcdefg", return_value)
+    self.assertEqual("abcdefg", peek_return_value)
     self.assertSourceReaderState(source_reader, lexeme="", position=0, eof=False)
-    source_reader.read(accepted_characters="abcdefg", mode=read_mode, max_lexeme_length=100)
+    read_return_value = source_reader.read(
+        accepted_characters="abcdefg", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(7, read_return_value)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme, position=7, eof=True)
 
   @parameterized.parameterized.expand([
@@ -305,18 +388,22 @@ class SourceReaderTest(absltest.TestCase):
   ])
   def test_peek_when_buffer_is_full(self, _, read_mode: ReadMode, expected_lexemes: tuple[str]):
     source_reader = SourceReader(io.StringIO("abcdefghijklmnopqrstuvwxyz"), buffer_size=100)
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=1)
+    read_return_value1 = source_reader.read(
+        accepted_characters="a", mode=read_mode, max_lexeme_length=1
+    )
+    self.assertEqual(1, read_return_value1)
 
-    return_value = source_reader.peek(10)
+    peek_return_value = source_reader.peek(10)
 
-    self.assertEqual("bcdefghijk", return_value)
+    self.assertEqual("bcdefghijk", peek_return_value)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[0], position=1, eof=False)
-    source_reader.read(
+    read_return_value2 = source_reader.read(
         accepted_characters="",
         mode=read_mode,
         max_lexeme_length=100,
         invert_accepted_characters=True,
     )
+    self.assertEqual(25, read_return_value2)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexemes[1], position=26, eof=True)
 
   @parameterized.parameterized.expand([
@@ -327,16 +414,17 @@ class SourceReaderTest(absltest.TestCase):
   def test_peek_when_result_spans_buffers(self, _, read_mode: ReadMode, expected_lexeme: str):
     source_reader = SourceReader(io.StringIO("abcdefghijklmnopqrstuvwxyz"), buffer_size=3)
 
-    return_value = source_reader.peek(10)
+    peek_return_value = source_reader.peek(10)
 
-    self.assertEqual("abcdefghij", return_value)
+    self.assertEqual("abcdefghij", peek_return_value)
     self.assertSourceReaderState(source_reader, lexeme="", position=0, eof=False)
-    source_reader.read(
+    read_return_value = source_reader.read(
         accepted_characters="",
         mode=read_mode,
         max_lexeme_length=100,
         invert_accepted_characters=True,
     )
+    self.assertEqual(read_return_value, 26)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme, position=26, eof=True)
 
   @parameterized.parameterized.expand([
@@ -346,12 +434,15 @@ class SourceReaderTest(absltest.TestCase):
   ])
   def test_peek_when_at_eof(self, _, read_mode: ReadMode, expected_lexeme: str):
     source_reader = SourceReader(io.StringIO("aaaa"), buffer_size=3)
-    source_reader.read(accepted_characters="a", mode=read_mode, max_lexeme_length=100)
+    read_return_value = source_reader.read(
+        accepted_characters="a", mode=read_mode, max_lexeme_length=100
+    )
+    self.assertEqual(4, read_return_value)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme, position=4, eof=True)
 
-    return_value = source_reader.peek(10)
+    peek_return_value = source_reader.peek(10)
 
-    self.assertEqual("", return_value)
+    self.assertEqual("", peek_return_value)
     self.assertSourceReaderState(source_reader, lexeme=expected_lexeme, position=4, eof=True)
 
   def assertSourceReaderState(
