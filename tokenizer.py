@@ -44,27 +44,34 @@ class Tokenizer:
 
     return identifier
 
-  def skip_whitespace(self) -> None:
-    self.source_reader.read(
+  def skip_whitespace(self) -> bool:
+    character_read_count = self.source_reader.read(
         accepted_characters=_WHITESPACE_CHARS,
         mode=source_reader_module.ReadMode.SKIP,
         max_lexeme_length=None,
     )
+    return character_read_count > 0
 
-  def skip_inline_comment(self) -> None:
+  def skip_inline_comment(self) -> bool:
     potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
-    if potential_comment_starter == "//":
-      self.source_reader.read(
-          accepted_characters="\r\n",
-          mode=source_reader_module.ReadMode.SKIP,
-          max_lexeme_length=None,
-          invert_accepted_characters=True,
-      )
+    if potential_comment_starter != "//":
+      return False
 
-  def skip_multiline_comment(self) -> None:
+    self.source_reader.read(
+        accepted_characters="\r\n",
+        mode=source_reader_module.ReadMode.SKIP,
+        max_lexeme_length=None,
+        invert_accepted_characters=True,
+    )
+    return True
+
+  def skip_multiline_comment(self) -> bool:
     potential_comment_starter = self.source_reader.peek(desired_num_characters=2)
-    if potential_comment_starter == "/*":
-      self.source_reader.read_until_exact_match("*/", mode=source_reader_module.ReadMode.SKIP)
+    if potential_comment_starter != "/*":
+      return False
+
+    self.source_reader.read_until_exact_match("*/", mode=source_reader_module.ReadMode.SKIP)
+    return True
 
   class ParseError(Exception):
     pass

@@ -30,7 +30,7 @@ class TokenizerTest(absltest.TestCase):
 
     self.assertIsNone(return_value)
     self.assertFalse(tokenizer.eof())
-    tokenizer.skip_inline_comment()
+    self.assertTrue(tokenizer.skip_inline_comment())
     self.assertTrue(tokenizer.eof())
 
   def test_read_identifier_reads_a_single_character_identifier(self):
@@ -40,7 +40,7 @@ class TokenizerTest(absltest.TestCase):
 
     self.assertEqual("a", return_value)
     self.assertFalse(tokenizer.eof())
-    tokenizer.skip_whitespace()
+    self.assertTrue(tokenizer.skip_whitespace())
     self.assertTrue(tokenizer.eof())
 
   def test_read_identifier_reads_a_single_character_identifier_to_eof(self):
@@ -58,7 +58,7 @@ class TokenizerTest(absltest.TestCase):
 
     self.assertEqual("abc123_", return_value)
     self.assertFalse(tokenizer.eof())
-    tokenizer.skip_whitespace()
+    self.assertTrue(tokenizer.skip_whitespace())
     self.assertTrue(tokenizer.eof())
 
   def test_read_identifier_reads_a_multi_character_identifier_to_eof(self):
@@ -85,102 +85,139 @@ class TokenizerTest(absltest.TestCase):
   def test_skip_whitespace_on_empty_file(self):
     tokenizer = self.create_tokenizer("")
 
-    tokenizer.skip_whitespace()
+    return_value = tokenizer.skip_whitespace()
 
+    self.assertFalse(return_value)
     self.assertTrue(tokenizer.eof())
+
+  def test_skip_whitespace_when_not_on_whitespace(self):
+    tokenizer = self.create_tokenizer("abcd")
+
+    return_value = tokenizer.skip_whitespace()
+
+    self.assertFalse(return_value)
+    self.assertFalse(tokenizer.eof())
 
   def test_skip_whitespace_on_entirely_whitespace_file(self):
     tokenizer = self.create_tokenizer("\t\r\n  \n  \r \r\r  \n\n  \t")
 
-    tokenizer.skip_whitespace()
+    return_value = tokenizer.skip_whitespace()
 
+    self.assertTrue(return_value)
     self.assertTrue(tokenizer.eof())
 
   def test_skip_whitespace_skips_to_first_non_whitespace_character(self):
     tokenizer = self.create_tokenizer("\r\n \n \n\n\r   \t\t\r\nabc")
 
-    tokenizer.skip_whitespace()
+    return_value = tokenizer.skip_whitespace()
 
+    self.assertTrue(return_value)
     self.assertFalse(tokenizer.eof())
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_inline_comment_on_empty_file(self):
     tokenizer = self.create_tokenizer("")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertFalse(return_value)
     tokenizer.skip_whitespace()
     self.assertTrue(tokenizer.eof())
+
+  def test_skip_inline_comment_when_not_at_a_comment(self):
+    tokenizer = self.create_tokenizer("abcd")
+
+    return_value = tokenizer.skip_inline_comment()
+
+    self.assertFalse(return_value)
+    self.assertFalse(tokenizer.eof())
 
   def test_skip_inline_comment_on_file_containing_entire_an_inline_comment(self):
     tokenizer = self.create_tokenizer("// This comment is the entire file")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertTrue(tokenizer.eof())
 
   def test_skip_inline_comment_skips_embedded_slash_slash(self):
     tokenizer = self.create_tokenizer("// A comment/////////\rabc")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_inline_comment_skips_entirely_slash_comment(self):
     tokenizer = self.create_tokenizer("///////////\rabc")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_inline_comment_skips_until_but_excluding_cr(self):
     tokenizer = self.create_tokenizer("// A comment\rabc")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_inline_comment_skips_until_but_excluding_lf(self):
     tokenizer = self.create_tokenizer("// A comment\nabc")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_inline_comment_skips_until_but_excluding_crlf(self):
     tokenizer = self.create_tokenizer("// A comment\r\nabc")
 
-    tokenizer.skip_inline_comment()
+    return_value = tokenizer.skip_inline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def test_skip_multiline_comment_on_empty_file(self):
     tokenizer = self.create_tokenizer("/* This comment is the entire file\r\n \n \r \t*/")
 
-    tokenizer.skip_multiline_comment()
+    return_value = tokenizer.skip_multiline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertTrue(tokenizer.eof())
+
+  def test_skip_multiline_comment_when_not_on_a_comment(self):
+    tokenizer = self.create_tokenizer("abcd")
+
+    return_value = tokenizer.skip_multiline_comment()
+
+    self.assertFalse(return_value)
+    self.assertFalse(tokenizer.eof())
 
   def test_skip_multiline_comment_on_file_containing_entirely_a_multiline_comment(self):
     tokenizer = self.create_tokenizer("/* This comment is the entire file\r\n \n \r \t  */")
 
-    tokenizer.skip_multiline_comment()
+    return_value = tokenizer.skip_multiline_comment()
 
+    self.assertTrue(return_value)
     tokenizer.skip_whitespace()
     self.assertTrue(tokenizer.eof())
 
   def test_skip_multiline_comment_on_comment_containing_entirely_stars(self):
     tokenizer = self.create_tokenizer("/************/abc")
 
-    tokenizer.skip_multiline_comment()
+    return_value = tokenizer.skip_multiline_comment()
 
+    self.assertTrue(return_value)
     self.assertEqual("abc", tokenizer.read_identifier())
 
   def create_tokenizer(self, text: str) -> Tokenizer:
